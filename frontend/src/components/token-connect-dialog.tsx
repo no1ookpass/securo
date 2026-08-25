@@ -25,6 +25,8 @@ interface TokenConnectDialogProps {
 
 const PROVIDER_BRIDGE_URLS: Record<string, string> = {
   simplefin: 'https://bridge.simplefin.org/simplefin/create',
+  // Free Akahu Personal App — both the user & app tokens come from here.
+  akahu: 'https://my.akahu.nz/developers',
 }
 
 export function TokenConnectDialog({

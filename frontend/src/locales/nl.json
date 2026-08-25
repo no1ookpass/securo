@@ -680,6 +680,10 @@
         "title": "Maak verbinding via SimpleFIN",
         "description": "SimpleFIN is een alleen-lezen bankgegevensprotocol. Ga naar de SimpleFIN Bridge, kies uw bank en kopieer het installatietoken hierheen."
       },
+      "akahu": {
+        "title": "Maak verbinding via Akahu",
+        "description": "Akahu maakt verbinding met Nieuw-Zeelandse banken. Maak een gratis personal app aan op my.akahu.nz/developers en plak hier beide tokens."
+      },
       "reconnectTitle": "Maak opnieuw verbinding met een nieuw token",
       "reconnectDescription": "Plak een nieuw installatietoken om deze verbinding te vernieuwen. Bestaande rekeningen, transacties, categorieën en regels blijven behouden.",
       "reconnect": "Maak opnieuw verbinding"
@@ -693,6 +697,9 @@
       },
       "simplefin": {
         "description": "Amerikaanse en internationale banken via SimpleFIN Bridge"
+      },
+      "akahu": {
+        "description": "Nieuw-Zeelandse banken via je eigen gratis Akahu Personal App"
       }
     },
     "reconnected": "Bank heeft opnieuw verbinding gemaakt"

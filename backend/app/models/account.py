@@ -30,6 +30,10 @@ class Account(Base):
     # the provider exposes one. Provider-owned like `name`: refreshed on sync,
     # not user-editable. Never holds the full identifier.
     masked_number: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    # Institution logo for this account. Provider-owned like `name`: refreshed
+    # on sync. Falls back to the connection's logo when unset. Needed because a
+    # single connection (e.g. Akahu) can span many institutions.
+    logo_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     type: Mapped[str] = mapped_column(String(50))  # checking, savings, credit_card
     balance: Mapped[Decimal] = mapped_column(Numeric(precision=15, scale=2), default=Decimal("0.00"))
     currency: Mapped[str] = mapped_column(String(3), default="USD")

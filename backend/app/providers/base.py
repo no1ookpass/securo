@@ -70,6 +70,10 @@ class AccountData:
     # provider exposes one. Disambiguates accounts a bank reports under an
     # identical name (issue #408). Never the full identifier — see mask_last4.
     masked_number: Optional[str] = None
+    # Institution logo for this specific account. Aggregators that span many
+    # institutions under one connection (e.g. Akahu) expose a per-account logo;
+    # others leave it None and the connection logo is used as the fallback.
+    logo_url: Optional[str] = None
 
 
 @dataclass

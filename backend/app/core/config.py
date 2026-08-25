@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     simplefin_enabled: bool = False
     simplefin_api_url: str = "https://beta-bridge.simplefin.org"
 
+    # Akahu (NZ banks, free Personal App). Each connection carries its own
+    # tokens pasted by the user (like SimpleFIN), so no app credentials live on
+    # the server — just an enable flag and an optional API URL override.
+    akahu_enabled: bool = False
+    akahu_api_url: str = "https://api.akahu.io"
+
     # Frontend
     frontend_url: str = "http://localhost:5173"
 

@@ -680,6 +680,10 @@
         "title": "Connect via SimpleFIN",
         "description": "SimpleFIN is a read-only bank data protocol. Go to the SimpleFIN Bridge, pick your bank, and copy the setup token back here."
       },
+      "akahu": {
+        "title": "Connect via Akahu",
+        "description": "Akahu connects to New Zealand banks. Create a free Personal App at my.akahu.nz/developers and paste both of your tokens here."
+      },
       "reconnectTitle": "Reconnect with a fresh token",
       "reconnectDescription": "Paste a new setup token to refresh this connection in place. Existing accounts, transactions, categories, and rules are preserved.",
       "reconnect": "Reconnect"
@@ -693,6 +697,9 @@
       },
       "simplefin": {
         "description": "US and international banks via SimpleFIN Bridge"
+      },
+      "akahu": {
+        "description": "New Zealand banks via your own free Akahu Personal App"
       }
     },
     "reconnected": "Bank reconnected successfully"

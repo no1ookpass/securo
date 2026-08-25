@@ -680,6 +680,10 @@
         "title": "Connexion via SimpleFIN",
         "description": "SimpleFIN est un protocole de données bancaires en lecture seule. Rendez-vous sur le SimpleFIN Bridge, choisissez votre banque et recopiez le jeton de configuration ici."
       },
+      "akahu": {
+        "title": "Connexion via Akahu",
+        "description": "Akahu connecte les banques néo-zélandaises. Créez une application personnelle gratuite sur my.akahu.nz/developers et collez ici vos deux jetons."
+      },
       "reconnectTitle": "Reconnexion avec un nouveau jeton",
       "reconnectDescription": "Collez un nouveau jeton de configuration pour actualiser cette connexion sur place. Les comptes, transactions, catégories et règles existants sont conservés.",
       "reconnect": "Reconnecter"
@@ -693,6 +697,9 @@
       },
       "simplefin": {
         "description": "Banques américaines et internationales via SimpleFIN Bridge"
+      },
+      "akahu": {
+        "description": "Banques néo-zélandaises via votre propre application personnelle Akahu gratuite"
       }
     },
     "reconnected": "Banque reconnectée avec succès"

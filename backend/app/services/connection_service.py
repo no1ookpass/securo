@@ -590,6 +590,7 @@ async def handle_oauth_callback(
             external_id=acc_data.external_id,
             name=acc_data.name,
             masked_number=acc_data.masked_number,
+            logo_url=_clean_logo_url(acc_data.logo_url),
             type=acc_data.type,
             balance=acc_data.balance,
             currency=acc_data.currency,
@@ -1247,6 +1248,8 @@ async def sync_connection(
                 # that intermittently omits it can't blank out a known mask.
                 if acc_data.masked_number is not None:
                     account.masked_number = acc_data.masked_number
+                if acc_data.logo_url is not None:
+                    account.logo_url = _clean_logo_url(acc_data.logo_url)
                 if acc_data.type == "credit_card":
                     # Preserve existing CC metadata when the provider doesn't
                     # expose it. Pluggy's creditData fields (limit, close/due
@@ -1275,6 +1278,7 @@ async def sync_connection(
                     external_id=acc_data.external_id,
                     name=acc_data.name,
                     masked_number=acc_data.masked_number,
+                    logo_url=_clean_logo_url(acc_data.logo_url),
                     type=acc_data.type,
                     balance=acc_data.balance,
                     currency=acc_data.currency,

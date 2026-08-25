@@ -52,6 +52,9 @@ config:
   enableBankingOauthRedirectUri: ""
   simplefinEnabled: "false"
   simplefinApiUrl: "https://beta-bridge.simplefin.org"
+  # Akahu (NZ banks) — free Personal App, no server credentials needed.
+  akahuEnabled: "false"
+  akahuApiUrl: "https://api.akahu.io"
   oidcEnabled: "false"
   oidcProviderName: "OIDC"
   oidcDiscoveryUrl: ""

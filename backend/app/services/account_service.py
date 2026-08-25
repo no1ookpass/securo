@@ -174,7 +174,9 @@ def serialize_account(
         "card_brand": acc.card_brand,
         "card_level": acc.card_level,
         "institution_name": _institution_name(connection),
-        "institution_logo_url": connection.logo_url if connection else None,
+        # Prefer the account's own logo — multi-institution connections (e.g.
+        # Akahu) set one per account. Fall back to the connection's logo.
+        "institution_logo_url": acc.logo_url or (connection.logo_url if connection else None),
         "available_credit": None,
         "next_close_date": None,
         "next_due_date": None,
