@@ -136,7 +136,8 @@ async def test_handle_oauth_callback_validates_and_builds_connection():
     assert conn.external_id == "user_abc123"
     assert conn.institution_name == "Demo Bank"
     assert conn.logo_url == "https://cdn.akahu.nz/logo.png"
-    assert conn.accounts[0].logo_url == "https://cdn.akahu.nz/logo.png"
+    assert conn.accounts[0].institution_name == "Demo Bank"
+    assert conn.accounts[0].institution_logo_url == "https://cdn.akahu.nz/logo.png"
     assert "user_token_enc" in conn.credentials
     assert "app_token_enc" in conn.credentials
     # Plaintext tokens must never end up in credentials.

@@ -289,8 +289,12 @@ class AkahuProvider(BankProvider):
             ),
             masked_number=mask_last4(raw.get("formatted_account")),
             # One Akahu connection spans many institutions, so each account
-            # carries its own institution logo (ASB vs Hatch vs Gem Visa).
-            logo_url=((raw.get("connection") or {}).get("logo") or None),
+            # carries its own institution (name/logo) via the account's
+            # `connection` object — the sync layer links the account to the
+            # right Institution row (issue #345: ASB vs Hatch vs Gem Visa).
+            institution_external_id=((raw.get("connection") or {}).get("_id") or None),
+            institution_name=((raw.get("connection") or {}).get("name") or None),
+            institution_logo_url=((raw.get("connection") or {}).get("logo") or None),
         )
 
     async def get_accounts(self, credentials: dict) -> list[AccountData]:
