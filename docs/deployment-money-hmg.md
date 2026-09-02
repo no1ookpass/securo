@@ -12,7 +12,9 @@ server exposed as `https://money.hmg.co.nz`.
   - `securo-pgdata-2026-09-02.dump` — `pg_dump -Fc` of the whole DB (users, workspace, categories, accounts, connections, transactions, settings, migration version).
   - `env-backup-2026-09-02` — the production `.env` (contains `SECRET_KEY`, Akahu tokens are encrypted with it — must be preserved verbatim).
   - `securo_*.tar.gz` — attachments / agent_knowledge / embedding_models volumes (all currently **empty**; kept for completeness).
-- Prod images built/tagged on the source machine:
+- Prod images built/tagged on the source machine — **validation only**, not needed
+  for the server (it builds its own from source, §3). Confirms the merged
+  backend + frontend build cleanly:
   - `ghcr.io/securo-finance/securo-backend:latest` (covers backend + celery-worker + celery-beat + mcp-server)
   - `ghcr.io/securo-finance/securo-frontend:latest` (nginx static build)
 
@@ -41,8 +43,10 @@ git checkout feat/akahu-provider
 
 ## 3. Build the images on the server
 
-`docker-compose.prod.yml` only **pulls** `ghcr.io/securo-finance/*:latest`, which
-is upstream's build (no Akahu). Build our branch under the same tags:
+This is the **recommended, simplest path** — checkout the source and build right
+here; no image transfer involved. `docker-compose.prod.yml` only **pulls**
+`ghcr.io/securo-finance/*:latest` (upstream's build, no Akahu), so build our
+branch under the same tags so compose resolves to our images:
 
 ```bash
 docker build -t ghcr.io/securo-finance/securo-backend:latest ./backend
