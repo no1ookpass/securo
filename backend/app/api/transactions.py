@@ -9,13 +9,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.app_clock import app_today
 from app.core.database import get_async_session
 from app.core.workspace_context import (
     WorkspaceContext,
     current_workspace,
     current_writable_workspace,
 )
-from app.schemas.transaction import BulkAddToGroupRequest, BulkCategorizeRequest, BulkTagsRequest, CreateCounterpartRequest, InstallmentSeriesCreate, LinkTransferRequest, TransactionBulkDeleteRequest, TransactionCreate, TransactionRead, TransactionUpdate, TransferCreate, TransferRead
+from app.schemas.transaction import BulkAddToGroupRequest, BulkCategorizeRequest, DescriptionSuggestion, BulkTagsRequest, CreateCounterpartRequest, InstallmentSeriesCreate, LinkTransferRequest, TransactionBulkDeleteRequest, TransactionCreate, TransactionRead, TransactionUpdate, TransferCreate, TransferRead
 from app.schemas.transaction_calendar import TransactionCalendarResponse
 from app.services import transaction_service
 from app.services.admin_service import get_credit_card_accounting_mode
@@ -125,6 +126,7 @@ async def list_transactions(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=500),
     include_opening_balance: bool = Query(False),
+    include_running_balance: bool = Query(False, description="Fill running_balance per row (issue #1202): one non-credit-card account, `from` set, include_opening_balance, no other filter, default order; null otherwise"),
     exclude_transfers: bool = Query(False),
     user_pnl_only: bool = Query(False, description="Return only rows that count toward dashboard/user income/expense totals"),
     exclude_ignored: bool = Query(False, description="Drop rows the user marked ignored, or whose category is ignored"),
@@ -132,7 +134,7 @@ async def list_transactions(
     min_amount: Optional[float] = Query(None, ge=0, description="Filter to transactions with absolute amount >= this value (primary currency)."),
     max_amount: Optional[float] = Query(None, ge=0, description="Filter to transactions with absolute amount <= this value (primary currency)."),
     sort_by: Optional[str] = Query(None, description="Column to sort by (date|amount|description|payee|category|account|type|status). Default: date desc."),
-    sort_dir: str = Query("desc", regex="^(asc|desc)$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     ctx: WorkspaceContext = Depends(current_workspace),
     session: AsyncSession = Depends(get_async_session),
 ):
@@ -157,6 +159,8 @@ async def list_transactions(
         min_amount=min_amount,
         max_amount=max_amount,
         include_summary=True,
+        include_running_balance=include_running_balance,
+        primary_currency=ctx.user.primary_currency,
     )
     primary_currency = ctx.user.primary_currency
     items = [_tag_fx_fallback(TransactionRead.model_validate(tx, from_attributes=True), primary_currency) for tx in transactions]
@@ -184,6 +188,17 @@ async def transaction_calendar(
         month,
         account_ids=_merge_id_filters(account_id, account_ids),
     )
+
+
+@router.get("/description-suggestions", response_model=list[DescriptionSuggestion])
+async def description_suggestions(
+    q: str = Query("", max_length=100),
+    limit: int = Query(8, ge=1, le=20),
+    ctx: WorkspaceContext = Depends(current_workspace),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Descriptions used before in this workspace that contain ``q``."""
+    return await transaction_service.suggest_descriptions(session, ctx.workspace.id, q, limit)
 
 
 @router.get("/export")
@@ -250,7 +265,7 @@ async def export_transactions(
         ])
 
     output.seek(0)
-    today = date.today().isoformat()
+    today = app_today().isoformat()
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
@@ -527,6 +542,26 @@ async def toggle_ignore_transaction(
     return _tag_fx_fallback(TransactionRead.model_validate(transaction, from_attributes=True), primary_currency)
 
 
+@router.post("/{transaction_id}/post-today", response_model=TransactionRead)
+async def post_transaction_today(
+    transaction_id: uuid.UUID,
+    ctx: WorkspaceContext = Depends(current_writable_workspace),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """One-click "it cleared today" for a pending transaction.
+
+    Marks the transaction as posted and stamps today's calendar date, resolved
+    in the workspace's timezone, the same as saving the edit dialog by hand.
+    """
+    transaction = await transaction_service.post_transaction_today(
+        session, transaction_id, ctx.workspace.id
+    )
+    if not transaction:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+    primary_currency = ctx.user.primary_currency
+    return _tag_fx_fallback(TransactionRead.model_validate(transaction, from_attributes=True), primary_currency)
+
+
 @router.patch("/{transaction_id}/unlink-recurring", response_model=TransactionRead)
 async def unlink_recurring_transaction(
     transaction_id: uuid.UUID,
@@ -548,7 +583,7 @@ async def unlink_recurring_transaction(
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_transaction(
     transaction_id: uuid.UUID,
-    apply_to: str = Query("this", regex="^(this|future|all)$", description="Installment-series scope: this row only (default), this + later installments, or the whole series. Ignored for non-installment transactions."),
+    apply_to: str = Query("this", pattern="^(this|future|all)$", description="Installment-series scope: this row only (default), this + later installments, or the whole series. Ignored for non-installment transactions."),
     ctx: WorkspaceContext = Depends(current_writable_workspace),
     session: AsyncSession = Depends(get_async_session),
 ):

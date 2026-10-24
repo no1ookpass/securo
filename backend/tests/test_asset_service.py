@@ -1,9 +1,11 @@
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import pytest_asyncio
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset
@@ -156,6 +158,57 @@ async def test_create_asset_with_initial_value(session: AsyncSession, test_user:
     assert result.current_value == 15000.0
     assert result.gain_loss == 3000.0
     assert result.value_count == 1
+
+
+@pytest.mark.asyncio
+async def test_create_asset_recovers_from_concurrent_external_id_conflict(monkeypatch):
+    workspace_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    existing_asset = Mock(id=uuid.uuid4())
+    missing_result = Mock()
+    missing_result.scalar_one_or_none.return_value = None
+    existing_result = Mock()
+    existing_result.scalar_one_or_none.return_value = existing_asset
+
+    session = Mock(spec=AsyncSession)
+    results = iter([missing_result, existing_result])
+
+    async def execute_scoped_lookup(statement):
+        statement_text = str(statement)
+        assert "assets.workspace_id" in statement_text
+        assert "assets.source" in statement_text
+        assert "assets.external_id" in statement_text
+        bound_values = set(statement.compile().params.values())
+        assert workspace_id in bound_values
+        assert "manual" in bound_values
+        assert "external-asset-1" in bound_values
+        return next(results)
+
+    session.execute = AsyncMock(side_effect=execute_scoped_lookup)
+    session.flush = AsyncMock(
+        side_effect=IntegrityError("INSERT INTO assets", {}, Exception("duplicate"))
+    )
+    session.rollback = AsyncMock()
+    session.add = Mock()
+    expected = Mock()
+    get_asset = AsyncMock(return_value=expected)
+    monkeypatch.setattr(asset_service, "get_asset", get_asset)
+
+    result = await asset_service.create_asset(
+        session,
+        workspace_id,
+        user_id,
+        AssetCreate(
+            name="External holding",
+            type="investment",
+            currency="USD",
+            external_id="external-asset-1",
+        ),
+    )
+
+    assert result is expected
+    session.rollback.assert_awaited_once()
+    get_asset.assert_awaited_once_with(session, existing_asset.id, workspace_id)
 
 
 @pytest.mark.asyncio
@@ -968,3 +1021,38 @@ async def test_get_assets_excludes_archived_by_default(session: AsyncSession, te
     names = [a.name for a in assets]
     assert "Visible" in names
     assert "Archived" not in names
+
+
+@pytest.mark.asyncio
+async def test_portfolio_trend_total_keeps_sub_cent_foreign_assets(
+    session: AsyncSession, test_user: User, test_workspace,
+):
+    """Low-priced foreign-currency holdings must add up in the trend total.
+
+    Three coins at 0.001 USD convert to 0.005 BRL each. Rounding every
+    holding to two decimals before summing lost them; summing first in
+    Decimal gives 0.015, shown as 0.02. A float sum would round it to 0.01.
+    """
+    today = date.today()
+    session.add(FxRate(
+        id=uuid.uuid4(), base_currency="USD", quote_currency="BRL",
+        date=today, rate=Decimal("5.0"), source="test",
+    ))
+    for i in range(3):
+        coin = Asset(
+            id=uuid.uuid4(), user_id=test_user.id, name=f"Coin {i}",
+            type="investment", currency="USD", valuation_method="market_price",
+            units=Decimal("1"), last_price=Decimal("0.001"), position=i,
+        )
+        session.add(coin)
+        await session.flush()
+        session.add(AssetValue(
+            id=uuid.uuid4(), asset_id=coin.id,
+            amount=Decimal("0.001"), date=today, source="sync",
+        ))
+    await session.commit()
+
+    result = await get_portfolio_trend(session, test_workspace.id, test_user.id)
+
+    assert result["trend"][-1]["_total"] == pytest.approx(0.02)
+    assert result["total"] == pytest.approx(0.02)

@@ -1,6 +1,7 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -9,7 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Asset
 from app.models.asset_value import AssetValue
+from app.models.fx_rate import FxRate
 from app.models.user import User
+from app.models.workspace import Workspace, WorkspaceMember
+from app.schemas.asset import MarketSymbolQuote
 
 
 @pytest_asyncio.fixture
@@ -81,6 +85,149 @@ async def test_create_asset(client: AsyncClient, auth_headers: dict):
     assert data["name"] == "New Car"
     assert data["current_value"] == 80000.0
     assert data["value_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_create_asset_with_external_id_returns_it_via_rest(
+    client: AsyncClient, auth_headers: dict
+):
+    response = await client.post(
+        "/api/assets",
+        headers=auth_headers,
+        json={
+            "name": "Exterior ETF",
+            "type": "investment",
+            "currency": "USD",
+            "current_value": 1250,
+            "external_id": "  portfolio-asset-1  ",
+        },
+    )
+    assert response.status_code == 201
+    created = response.json()
+    assert created["external_id"] == "portfolio-asset-1"
+    assert created["source"] == "manual"
+
+    detail = await client.get(f"/api/assets/{created['id']}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["external_id"] == "portfolio-asset-1"
+
+    listed = await client.get("/api/assets", headers=auth_headers)
+    assert listed.status_code == 200
+    assert any(
+        asset["id"] == created["id"]
+        and asset["external_id"] == "portfolio-asset-1"
+        for asset in listed.json()
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_market_price_asset_with_external_id_via_rest(
+    client: AsyncClient, auth_headers: dict
+):
+    provider = AsyncMock()
+    provider.get_quote.return_value = MarketSymbolQuote(
+        symbol="VOO",
+        name="Vanguard S&P 500 ETF",
+        exchange="NYSE Arca",
+        currency="USD",
+        price=625.50,
+        quote_type="ETF",
+    )
+    payload = {
+        "name": "Vanguard S&P 500 ETF",
+        "type": "investment",
+        "valuation_method": "market_price",
+        "ticker": "VOO",
+        "units": 3.5,
+        "external_id": "portfolio-voo",
+    }
+
+    with patch(
+        "app.services.asset_service.get_market_price_provider",
+        return_value=provider,
+    ):
+        first = await client.post("/api/assets", headers=auth_headers, json=payload)
+        second = await client.post("/api/assets", headers=auth_headers, json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json()["id"] == first.json()["id"]
+    assert first.json()["external_id"] == "portfolio-voo"
+    assert first.json()["source"] == "yfinance"
+    assert first.json()["ticker"] == "VOO"
+
+
+@pytest.mark.asyncio
+async def test_create_asset_is_idempotent_by_external_id_within_workspace(
+    client: AsyncClient, auth_headers: dict
+):
+    payload = {
+        "name": "Synced Holding",
+        "type": "investment",
+        "currency": "USD",
+        "current_value": 500,
+        "external_id": "portfolio-stable-id",
+    }
+
+    first = await client.post("/api/assets", headers=auth_headers, json=payload)
+    second = await client.post("/api/assets", headers=auth_headers, json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["value_count"] == 1
+
+    listed = await client.get("/api/assets", headers=auth_headers)
+    matching = [
+        asset
+        for asset in listed.json()
+        if asset["external_id"] == "portfolio-stable-id"
+    ]
+    assert len(matching) == 1
+
+
+@pytest.mark.asyncio
+async def test_same_external_id_is_allowed_in_different_workspaces(
+    client: AsyncClient,
+    auth_headers: dict,
+    session: AsyncSession,
+    test_user: User,
+    test_workspace: Workspace,
+):
+    other_workspace = Workspace(
+        id=uuid.uuid4(),
+        name="Other portfolio",
+        kind="personal",
+        created_by_user_id=test_user.id,
+        default_currency="USD",
+    )
+    session.add(other_workspace)
+    await session.flush()
+    session.add(
+        WorkspaceMember(
+            id=uuid.uuid4(),
+            workspace_id=other_workspace.id,
+            user_id=test_user.id,
+            role="owner",
+        )
+    )
+    await session.commit()
+
+    payload = {
+        "name": "Shared external key",
+        "type": "investment",
+        "currency": "USD",
+        "external_id": "same-provider-id",
+    }
+    first_headers = {**auth_headers, "X-Workspace-Id": str(test_workspace.id)}
+    second_headers = {**auth_headers, "X-Workspace-Id": str(other_workspace.id)}
+
+    first = await client.post("/api/assets", headers=first_headers, json=payload)
+    second = await client.post("/api/assets", headers=second_headers, json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] != second.json()["id"]
 
 
 @pytest.mark.asyncio
@@ -163,3 +310,120 @@ async def test_get_value_trend(client: AsyncClient, auth_headers: dict, test_ass
 async def test_unauthenticated_access(client: AsyncClient):
     response = await client.get("/api/assets")
     assert response.status_code == 401
+
+
+class TestAssetValuePrecision:
+    """FX conversion of asset values keeps price-field precision (issue #622).
+
+    A low-priced market asset held by a user in another currency must not
+    vanish from the primary-currency total: the converted value is rounded at
+    the asset price precision (six decimals), not the monetary two.
+    """
+
+    @pytest_asyncio.fixture
+    async def eur_rate(self, session: AsyncSession, clean_db) -> FxRate:
+        """USD -> EUR 0.92, same value the fx_rates fixture uses."""
+        fx = FxRate(
+            base_currency="USD",
+            quote_currency="EUR",
+            date=date.today(),
+            rate=Decimal("0.9200000000"),
+            source="test",
+        )
+        session.add(fx)
+        await session.commit()
+        await session.refresh(fx)
+        return fx
+
+    @pytest_asyncio.fixture
+    async def eur_user(
+        self, session: AsyncSession, test_user: User
+    ) -> User:
+        """The test user reads the portfolio in EUR, not BRL."""
+        test_user.preferences = {**(test_user.preferences or {}), "currency_display": "EUR"}
+        await session.commit()
+        return test_user
+
+    @pytest.mark.asyncio
+    async def test_list_keeps_sub_cent_value_in_primary_currency(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        session: AsyncSession,
+        eur_user: User,
+        test_workspace: Workspace,
+        eur_rate: FxRate,
+    ):
+        # One unit of a low-priced coin, worth a fraction of a cent.
+        asset = Asset(
+            id=uuid.uuid4(),
+            user_id=eur_user.id,
+            workspace_id=test_workspace.id,
+            name="Coin A",
+            type="investment",
+            currency="USD",
+            units=Decimal("1"),
+            valuation_method="market_price",
+            purchase_price=Decimal("0.00"),
+            last_price=Decimal("0.002087"),
+            ticker="COIN-USD",
+            position=0,
+        )
+        session.add(asset)
+        await session.commit()
+
+        headers = {**auth_headers, "X-Workspace-Id": str(test_workspace.id)}
+        response = await client.get("/api/assets", headers=headers)
+
+        assert response.status_code == 200
+        entry = next(a for a in response.json() if a["id"] == str(asset.id))
+        # 0.002087 USD * 0.92 = 0.001920 EUR at price precision. The
+        # two-decimal quantization the issue reports returned 0.0 here.
+        assert entry["current_value"] == pytest.approx(0.002087)
+        assert entry["current_value_primary"] == pytest.approx(0.00192)
+        assert entry["gain_loss"] == pytest.approx(0.002087)
+        assert entry["gain_loss_primary"] == pytest.approx(0.00192)
+
+    @pytest.mark.asyncio
+    async def test_values_at_total_keeps_sub_cent_assets(
+        self,
+        session: AsyncSession,
+        eur_user: User,
+        test_workspace: Workspace,
+        eur_rate: FxRate,
+    ):
+        """get_asset_values_at (the rollup behind the dashboard total and the
+        trend chart) must not drop low-priced holdings from the primary
+        total: each converted amount keeps six decimals, so the sum of
+        sub-cent values is correct. 2 x 0.002087 USD = 0.004174, and
+        0.002087 x 0.92 = 0.001920 per coin. Before the fix each asset
+        converted to 0.0 separately and the primary total was 0.0."""
+        from app.services.asset_service import get_asset_values_at
+
+        for i in range(2):
+            session.add(
+                Asset(
+                    id=uuid.uuid4(),
+                    user_id=eur_user.id,
+                    workspace_id=test_workspace.id,
+                    name=f"Coin {i}",
+                    type="investment",
+                    currency="USD",
+                    units=Decimal("1"),
+                    valuation_method="market_price",
+                    last_price=Decimal("0.002087"),
+                    ticker="COIN-USD",
+                    position=i,
+                )
+            )
+        await session.commit()
+
+        totals, primary_total = await get_asset_values_at(
+            session,
+            test_workspace.id,
+            primary_currency="EUR",
+            by_workspace=True,
+        )
+
+        assert totals["USD"] == pytest.approx(0.004174)
+        assert primary_total == pytest.approx(0.00384)
