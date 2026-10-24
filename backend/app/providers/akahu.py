@@ -44,6 +44,7 @@ from app.providers.base import (
     BankProvider,
     ConnectionData,
     ProviderRateLimited,
+    RefreshOutcome,
     SessionExpiredError,
     TransactionData,
     mask_last4,
@@ -403,3 +404,30 @@ class AkahuProvider(BankProvider):
             raise SessionExpiredError("Akahu credentials missing; reconnect")
         # Personal App tokens are long-lived; nothing to rotate.
         return credentials
+
+    async def trigger_refresh(self, credentials: dict | None) -> RefreshOutcome:
+        """Ask Akahu to pull fresh data from the bank on demand.
+
+        Akahu serves a cached copy of the bank's data and re-fetches it on its
+        own schedule (default ~once per 24h), so a plain Securo sync can read
+        transactions a day or more older than the bank actually has. Manual
+        "Sync now" calls this to request an on-demand refresh via
+        ``POST /v1/refresh``; Akahu then re-pulls from the institution
+        asynchronously, and the read that follows picks up what it now serves.
+        """
+        user_token, app_token = self._tokens(credentials or {})
+        if not user_token or not app_token:
+            return "needs_user_action"
+        try:
+            await self._request(
+                "POST", "/refresh", user_token=user_token, app_token=app_token
+            )
+        except SessionExpiredError:
+            return "needs_user_action"
+        except ProviderRateLimited:
+            # A refresh already ran within the rest period — data is as fresh
+            # as Akahu will make it right now, so just proceed to the read.
+            return "skipped"
+        except httpx.HTTPError:
+            return "failed"
+        return "refreshed"

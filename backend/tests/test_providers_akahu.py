@@ -410,3 +410,64 @@ async def test_refresh_credentials_returns_unchanged():
         "app_token": APP_TOKEN,
     }
     assert await provider.refresh_credentials(creds) is creds
+
+
+@pytest.mark.asyncio
+async def test_trigger_refresh_success_returns_refreshed():
+    def handler(request: httpx.Request) -> httpx.Response:
+        _auth_ok(request)
+        assert request.method == "POST"
+        # The client's base_url already ends in /v1.
+        assert request.url.path == "/v1/refresh"
+        return httpx.Response(200, json={"success": True})
+
+    provider = AkahuProvider()
+    creds = {
+        "user_token_enc": None,
+        "app_token_enc": None,
+        "user_token": USER_TOKEN,
+        "app_token": APP_TOKEN,
+    }
+    with _patched_client(handler):
+        assert await provider.trigger_refresh(creds) == "refreshed"
+
+
+@pytest.mark.asyncio
+async def test_trigger_refresh_rate_limited_returns_skipped():
+    # 429 = a refresh already ran within the rest period; proceed to the read.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429, json={"success": False, "message": "Refresh initiated within last 5 minutes"}
+        )
+
+    provider = AkahuProvider()
+    creds = {
+        "user_token_enc": None,
+        "app_token_enc": None,
+        "user_token": USER_TOKEN,
+        "app_token": APP_TOKEN,
+    }
+    with _patched_client(handler):
+        assert await provider.trigger_refresh(creds) == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_trigger_refresh_401_returns_needs_user_action():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"success": False, "message": "Unauthorized"})
+
+    provider = AkahuProvider()
+    creds = {
+        "user_token_enc": None,
+        "app_token_enc": None,
+        "user_token": USER_TOKEN,
+        "app_token": APP_TOKEN,
+    }
+    with _patched_client(handler):
+        assert await provider.trigger_refresh(creds) == "needs_user_action"
+
+
+@pytest.mark.asyncio
+async def test_trigger_refresh_missing_tokens_returns_needs_user_action():
+    provider = AkahuProvider()
+    assert await provider.trigger_refresh({}) == "needs_user_action"
