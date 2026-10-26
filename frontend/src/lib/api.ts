@@ -1592,6 +1592,13 @@ export const reports = {
     const { data } = await api.get('/reports/cash-flow', { params: { months, interval, baseline, ...(extra.params ?? {}) }, ...(extra.paramsSerializer ? { paramsSerializer: extra.paramsSerializer } : {}) })
     return data
   },
+  // Oldest and newest transaction dates in the workspace (opening
+  // balances excluded). The reports page builds its year picker from
+  // these bounds (issue #765).
+  dataRange: async (): Promise<{ min_date: string | null; max_date: string | null }> => {
+    const { data } = await api.get('/reports/data-range')
+    return data
+  },
 }
 
 // Currencies
@@ -1914,7 +1921,13 @@ export const agents = {
     const { data } = await api.get(`/agents/${id}`)
     return data
   },
-  create: async (payload: Partial<Agent> & { name: string }): Promise<Agent> => {
+  create: async (
+    payload: Partial<Agent> & {
+      name: string
+      /** Tool whitelist saved with the agent in the same transaction. */
+      tools?: { server: string; tool_name: string; enabled: boolean }[]
+    },
+  ): Promise<Agent> => {
     const { data } = await api.post('/agents', payload)
     return data
   },

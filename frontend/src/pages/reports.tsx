@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from 'react'
 import { loadReportsRange, saveReportsRange, type ReportsRange } from '@/lib/remembered-range'
 import { useTranslation } from 'react-i18next'
-import { useDisplayLocale } from '@/hooks/use-display-locale'
+import { useDateLocale, useDisplayLocale } from '@/hooks/use-display-locale'
 import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart,
@@ -19,7 +19,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from 'recharts'
-import { AlertCircle, ChevronLeft, ChevronRight, HelpCircle, X } from 'lucide-react'
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, HelpCircle, X } from 'lucide-react'
 import { reports } from '@/lib/api'
 import { extractApiError } from '@/lib/api-errors'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -72,7 +72,7 @@ function formatCompact(value: number, currency = 'USD', locale = 'en-US') {
   }).format(value)
 }
 
-/** "Apr 2026" from a YYYY-MM-DD date, in the display locale. */
+/** "Apr 2026" from a YYYY-MM-DD date, in the date locale. */
 function formatShortMonth(isoDate: string, locale: string) {
   const [y, m] = isoDate.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleDateString(locale, { month: 'short', year: 'numeric' })
@@ -226,6 +226,9 @@ export default function ReportsPage() {
   const { user } = useAuth()
   const userCurrency = user?.preferences?.currency_display ?? 'USD'
   const locale = useDisplayLocale()
+  // Month and day words follow the app language, not the currency locale: a
+  // Portuguese UI showing US dollars still reads "Setembro de 2026".
+  const dateLocale = useDateLocale()
 
   const customDefaults = defaultCustomRange()
   // The page opens on the first tab with the range last used there (issue
@@ -330,9 +333,9 @@ export default function ReportsPage() {
     isCustomRange && !activeWindow
       ? t('reports.customRange')
       : activeWindow && selectedRange.monthAnchor !== undefined
-        ? monthLabel(activeWindow.from.slice(0, 7), locale)
+        ? monthLabel(activeWindow.from.slice(0, 7), dateLocale)
         : activeWindow
-          ? `${formatShortMonth(activeWindow.from, locale)} - ${formatShortMonth(activeWindow.to, locale)}`
+          ? `${formatShortMonth(activeWindow.from, dateLocale)} - ${formatShortMonth(activeWindow.to, dateLocale)}`
           : t(`reports.${RANGE_LABELS[selectedRange.key]}`)
 
   const handleSelectTab = (key: string) => {
@@ -365,6 +368,38 @@ export default function ReportsPage() {
     if (!nextTab.intervalOptions.some((i) => i.value === interval)) {
       setInterval(nextTab.fallbackInterval)
     }
+  }
+
+  // Year picker (issue #765): one entry per year the workspace's data
+  // covers, from this year back to the oldest transaction. Hidden until the
+  // data spans at least two years, and never on Cash Flow, which has no
+  // custom range a picked year can be committed into.
+  const { data: dataRange } = useQuery({
+    queryKey: ['reports', 'data-range'],
+    queryFn: reports.dataRange,
+    staleTime: 5 * 60 * 1000,
+  })
+  const todayStr = todayInTimezone(timeZone)
+  const currentYear = Number(todayStr.slice(0, 4))
+  const minYear = dataRange?.min_date ? Number(dataRange.min_date.slice(0, 4)) : null
+  const yearOptions =
+    minYear !== null && minYear < currentYear
+      ? Array.from({ length: currentYear - minYear + 1 }, (_, i) => currentYear - i)
+      : []
+  // The year a committed custom range covers exactly: Jan 1 through
+  // Dec 31, or through today for the current year.
+  const activeYear = yearOptions.find(
+    (year) =>
+      isCustomRange &&
+      customFrom === `${year}-01-01` &&
+      customTo === (year === currentYear ? todayStr : `${year}-12-31`),
+  )
+  const handleYearPick = (year: number) => {
+    setCustomFrom(`${year}-01-01`)
+    setCustomTo(year === currentYear ? todayStr : `${year}-12-31`)
+    setRangeKey(CUSTOM_RANGE_KEY)
+    setPeriodOffset(0)
+    setSelectedDate(null)
   }
 
   const { data, isLoading, isError, error, refetch } = useQuery<ReportResponse>({
@@ -427,7 +462,7 @@ export default function ReportsPage() {
   const formatDay = (iso: string) => {
     const day = new Date(iso + 'T00:00:00')
     const sameYear = day.getFullYear() === new Date().getFullYear()
-    return day.toLocaleDateString(locale, {
+    return day.toLocaleDateString(dateLocale, {
       day: 'numeric',
       month: 'short',
       ...(sameYear ? {} : { year: 'numeric' }),
@@ -733,6 +768,43 @@ export default function ReportsPage() {
                   label={t('reports.customRange')}
                   placeholder={t('reports.pickCustomRange')}
                 />
+              )}
+              {supportsCustomRange && yearOptions.length > 1 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={activeYear !== undefined ? `${t('reports.year')} ${activeYear}` : t('reports.year')}
+                      title={t('reports.yearPickerHelp')}
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        activeYear !== undefined
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      <CalendarDays className="mr-1 inline h-3.5 w-3.5" />
+                      {activeYear !== undefined ? activeYear : t('reports.year')}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-1">
+                    <div className="max-h-64 overflow-y-auto">
+                      {yearOptions.map((year) => (
+                        <button
+                          key={year}
+                          type="button"
+                          onClick={() => handleYearPick(year)}
+                          className={`block w-full px-3 py-1.5 text-left text-xs font-semibold transition-colors ${
+                            activeYear === year
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          {year}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
             {/* Period navigation (issue #519): step the active window back and

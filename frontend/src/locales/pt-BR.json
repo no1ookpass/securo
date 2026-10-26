@@ -1903,6 +1903,9 @@
     "oversellWarning": "Você só possui {{available}} unidades — posições vendidas (short) não são suportadas.",
     "noPriceBadge": "sem preço",
     "noPriceWarning": "Adicionado sem preço de compra — adicione suas compras para acompanhar o preço médio e a rentabilidade.",
+    "noFxRate": "sem cotação",
+    "noFxRateTitle": "Não há cotação disponível para esta moeda. O ativo aparece na moeda original e fica de fora dos totais.",
+    "fxRateMissing": "Não há cotação disponível para {{currencies}}. Esses ativos aparecem na moeda original e ficam de fora dos totais.",
     "colAsset": "Ativo",
     "colQuantity": "Qtd.",
     "colAvgPrice": "Preço médio",
@@ -2051,6 +2054,8 @@
     "rangeLastMonth": "Mês passado",
     "periodPrev": "Período anterior",
     "periodNext": "Próximo período",
+    "year": "Ano",
+    "yearPickerHelp": "Mostrar um ano-calendário dos seus dados",
     "intervalDaily": "D",
     "intervalWeekly": "S",
     "intervalMonthly": "M",
@@ -2536,6 +2541,28 @@
     "finish": "Começar"
   },
   "agents": {
+    "templates": {
+      "title": "Começar com um modelo",
+      "subtitle": "Agentes prontos para tarefas comuns. Um clique cria um agente totalmente funcional, que dá para renomear e editar.",
+      "create": "Criar",
+      "presetHint": "Começando a partir do modelo {{template}}. Tudo é editável.",
+      "savingsAdvisor": {
+        "name": "Assessor de economia",
+        "description": "Compara seu gasto mês a mês e sugere onde guardar mais dinheiro."
+      },
+      "monthlyReview": {
+        "name": "Revisão mensal",
+        "description": "Resume seu mês: renda, gastos, patrimônio e o que observar."
+      },
+      "budgetWatcher": {
+        "name": "Fiscal de orçamentos",
+        "description": "Acompanha seus orçamentos e avisa quais estão perto do limite ou estourados."
+      },
+      "recurringAuditor": {
+        "name": "Auditor de recorrentes",
+        "description": "Lista suas assinaturas e marca cobranças esquecidas, duplicadas ou aumentadas."
+      }
+    },
     "title": "Agentes",
     "subtitle": "Construa assistentes conversacionais sobre seus dados do Securo. Cada agente pode ter sua própria base de conhecimento, ferramentas e provedor.",
     "newAgent": "Novo agente",
@@ -2662,7 +2689,9 @@
         "create_recurring_transaction": "Adicionar transação recorrente",
         "update_recurring_transaction": "Atualizar transação recorrente",
         "cancel_recurring_transaction": "Cancelar transação recorrente",
-        "create_goal": "Criar meta"
+        "create_goal": "Criar meta",
+        "link_transfer": "Vincular como transferência",
+        "unlink_transfer": "Desvincular transferência"
       },
       "summary": {
         "categorize": "{{count}} transação(ões) → {{category}}",
@@ -2674,7 +2703,9 @@
         "updateRecurring": "{{description}} → {{changes}}",
         "deactivateRecurring": "Parar futuras ocorrências de “{{description}}” (histórico mantido)",
         "deleteRecurring": "Excluir permanentemente “{{description}}”",
-        "createGoal": "“{{name}}” — meta {{target}}, prazo {{deadline}}"
+        "createGoal": "“{{name}}” — meta {{target}}, prazo {{deadline}}",
+        "linkTransfer": "{{from}} → {{to}}",
+        "unlinkTransfer": "{{from}} e {{to}} voltam a ser transações comuns"
       }
     },
     "conversation": {

@@ -34,7 +34,12 @@ from app.services._query_filters import (
     is_not_ignored,
     reporting_date_col,
 )
-from app.services.credit_card_service import apply_effective_date, compute_available_credit, get_cycle_dates
+from app.services.credit_card_service import (
+    apply_effective_date,
+    cc_cycle_bill_due_dates,
+    compute_available_credit,
+    get_cycle_dates,
+)
 from app.services.fx_rate_service import _resolve_rate
 from app.models.category import Category
 
@@ -880,6 +885,10 @@ async def get_account_summary(
         return None
 
     today = app_today()
+    # Captured before the defaults below fill in None dates, so the
+    # bill-based window rule only applies to windows the caller actually
+    # sent (issue #563).
+    explicit_window = date_from is not None and date_to is not None
     if not date_from:
         date_from = today.replace(day=1)
     if not date_to:
@@ -934,6 +943,59 @@ async def get_account_summary(
     # a tx belongs to via `effective_bill_date`. We honor that first so the
     # totals card and bar chart agree with the transactions list (issue #92).
     bucket_date = func.coalesce(Transaction.effective_bill_date, Transaction.date)
+
+    # Bill-based membership for the plain (cycle-math) window: when the
+    # caller sent a window that is exactly one bill cycle of this credit
+    # card account, an overridden tx belongs to the bill whose
+    # (previous due date, due date] range contains the override, not to the
+    # purchase window that contains it (for due-before-close cards a due
+    # date sits in the NEXT cycle's window, issue #563).
+    cycle = None
+    if (
+        explicit_window
+        and bill_id is None
+        and not unbilled_only
+        and account.type == "credit_card"
+    ):
+        cycle = cc_cycle_bill_due_dates(
+            date_from, date_to,
+            account.statement_close_day, account.payment_due_day,
+        )
+
+    def _membership():
+        """Window predicate for these totals: the plain date window, or
+        the bill-based rule above when the window is one of this
+        account's cycles. The actuals cap (bucket_date <= today) and the
+        forecast condition stay on the queries, so a tx in one bill's
+        window can still not leak into another bill's totals."""
+        if cycle is None or cycle["degenerate"]:
+            return and_(bucket_date >= date_from, bucket_date <= date_to)
+        override = Transaction.effective_bill_date
+        return or_(
+            and_(
+                override.is_(None),
+                bucket_date >= date_from,
+                bucket_date <= date_to,
+            ),
+            # (previous due date, this due date]: each override date maps
+            # to exactly one bill.
+            and_(override > cycle["prev"], override <= cycle["this"]),
+        )
+
+    def _before_window():
+        """Rows that belong to an earlier cycle than this one, under the
+        same rule as `_membership`: without a cycle, anything bucketed
+        before the window; with one, rows without an override bucketed
+        before the window plus overrides on or before the previous bill's
+        due date. Keeps older debt and this cycle's rows disjoint, so a
+        charge moved onto the previous bill counts as older debt."""
+        if cycle is None or cycle["degenerate"]:
+            return bucket_date < date_from
+        override = Transaction.effective_bill_date
+        return or_(
+            and_(override.is_(None), bucket_date < date_from),
+            override <= cycle["prev"],
+        )
 
     # Bill-driven filter (issue #92): when the caller passes bill_id, include
     #   (a) txs linked to this bill via Pluggy's billId mapping, AND
@@ -997,7 +1059,11 @@ async def get_account_summary(
                     future_override,
                 ),
             )
-        return query.where(bucket_date >= date_from, bucket_date <= date_to)
+        # Plain cycle-math window: bill-based membership when the window is
+        # one of this credit card account's cycles (issue #563), plain date
+        # window otherwise (non-CC accounts, wider ranges, degenerate
+        # close/due pairs).
+        return query.where(_membership())
 
     # Which exclusions these totals answer to. A credit card's four summary
     # numbers are all bill-side — they describe what the bank put on the
@@ -1008,6 +1074,69 @@ async def get_account_summary(
     summary_filter = (
         counts_on_bill() if account.type == "credit_card" else counts_as_pnl()
     )
+
+    # Intermediate payments into the card (the credit leg of a paired
+    # transfer) reduce the bill total, but only by what is left after
+    # they settle the debt that was already outstanding when the window
+    # opened. Banks apply repayments oldest first: paying last cycle's
+    # bill inside this window must not read as this cycle's charges
+    # disappearing, while anything paid beyond that older debt can only
+    # settle this cycle's charges, so the bank bills the net (issue #668).
+    prior_debt = 0.0
+    paid_now = 0.0
+    paid_later = 0.0
+    if account.type == "credit_card":
+        prior_result = await session.execute(
+            select(func.coalesce(func.sum(
+                case(
+                    (Transaction.type == "credit", effective_amount),
+                    else_=-effective_amount,
+                )
+            ), 0)).where(
+                Transaction.account_id == account_id,
+                _before_window(),
+                # Rows linked to the selected bill belong to it whatever
+                # their date (see `_scope`), so they are not older debt.
+                *([] if bill_id is None else [or_(
+                    Transaction.bill_id.is_(None), Transaction.bill_id != bill_id,
+                )]),
+                Transaction.is_ignored == False,
+                or_(
+                    Transaction.category_id.is_(None),
+                    Transaction.category_id.not_in(
+                        select(Category.id).where(Category.is_ignored == True)
+                    ),
+                ),
+            )
+        )
+        prior_debt = max(0.0, -float(prior_result.scalar() or 0))
+        paired_payment = and_(
+            counts_on_bill(net_payments=True),
+            Transaction.type == "credit",
+            Transaction.transfer_pair_id.is_not(None),
+            Transaction.source != "opening_balance",
+        )
+        paid_now_result = await session.execute(
+            _scope(select(func.coalesce(func.sum(func.abs(effective_amount)), 0)).where(
+                Transaction.account_id == account_id,
+                bucket_date <= today,
+                Transaction.status == "posted",
+                paired_payment,
+            ))
+        )
+        paid_now = float(paid_now_result.scalar() or 0)
+        paid_later_result = await session.execute(
+            _scope(select(func.coalesce(func.sum(func.abs(effective_amount)), 0)).where(
+                Transaction.account_id == account_id,
+                or_(Transaction.status == "pending", bucket_date > today),
+                paired_payment,
+            ))
+        )
+        paid_later = float(paid_later_result.scalar() or 0)
+    # What the posted payments leave over after the older debt, and what
+    # the pending/future ones add on top of that.
+    netted_now = max(0.0, paid_now - prior_debt)
+    netted_total = max(0.0, paid_now + paid_later - prior_debt)
 
     # Income = SUM of credit transactions in window (excluding opening_balance
     # and paired transfers).
@@ -1025,11 +1154,12 @@ async def get_account_summary(
 
     # Expenses = SUM of debit transactions in window (same exclusions).
     # For credit-card accounts, NET refund credits against debits so the
-    # cycle's "Total da fatura" matches the bank's bill (refunds reduce the
-    # invoice amount). Paired transfers are dropped by `transfer_pair_id`;
-    # unpaired card payments are dropped by the credit-side `treat_as_transfer`
-    # exclusion in `counts_on_bill` (see its docstring for why that's
-    # asymmetric with the debit side).
+    # cycle's "Total da fatura" matches the bank's bill (refunds reduce
+    # the invoice amount). Paired transfers are dropped by `transfer_pair_id`
+    # and netted separately below (see `netted_now`); unpaired card payments
+    # are dropped by the credit-side `treat_as_transfer` exclusion in
+    # `counts_on_bill` (see its docstring for why that's asymmetric with the
+    # debit side).
     if account.type == "credit_card":
         signed_for_bill = case(
             (Transaction.type == "credit", -func.abs(effective_amount)),
@@ -1054,7 +1184,7 @@ async def get_account_summary(
                 summary_filter,
             ))
         )
-    monthly_expenses = float(expenses_result.scalar())
+    monthly_expenses = float(expenses_result.scalar()) - netted_now
 
     # Forecast values use the same cycle/date scope as the actual totals, but
     # include every pending row and every row bucketed after today. The current
@@ -1094,7 +1224,9 @@ async def get_account_summary(
                 summary_filter,
             ))
         )
-    forecast_expenses = float(forecast_expense_result.scalar() or 0)
+    forecast_expenses = float(forecast_expense_result.scalar() or 0) - (
+        netted_total - netted_now
+    )
 
     opening_balance = (
         await get_period_opening_balance(session, account, date_from)
