@@ -111,12 +111,65 @@ async def categorisation_backtest(workspace_id: str | None = None) -> None:
                     )
 
 
+async def connections_backfill(connection_id: str) -> None:
+    """Re-read a connection's full history and import whatever is missing.
+
+    A normal sync only looks back far enough to catch changes since the last
+    one, so history an earlier (narrower) window skipped past is invisible to
+    it forever. This asks every account on the connection from
+    `FULL_HISTORY_SINCE` instead, through the ordinary sync path - the same
+    dedupe, payee matching and rules any other sync gets.
+
+    Safe to repeat: rows are matched on the provider's external id, so a second
+    run imports nothing new.
+    """
+    from app.models.bank_connection import BankConnection
+    from app.models.transaction import Transaction
+    from app.services.connection_service import sync_connection
+    from sqlalchemy import func
+
+    async with async_session_maker() as session:
+        connection = await session.get(BankConnection, uuid.UUID(connection_id))
+        if connection is None:
+            print(f"Error: no connection with id {connection_id}")
+            sys.exit(1)
+
+        before = await session.scalar(
+            select(func.count(Transaction.id)).where(
+                Transaction.workspace_id == connection.workspace_id,
+                Transaction.source != "opening_balance",
+            )
+        )
+        print(
+            f"Connection {connection.id} ({connection.provider}/"
+            f"{connection.institution_name}): {before} transactions before"
+        )
+
+        await sync_connection(
+            session,
+            connection.id,
+            connection.workspace_id,
+            connection.user_id,
+            full_history=True,
+        )
+
+        after = await session.scalar(
+            select(func.count(Transaction.id)).where(
+                Transaction.workspace_id == connection.workspace_id,
+                Transaction.source != "opening_balance",
+            )
+        )
+        print(f"imported {after - before} new transactions; {after} now")
+        await session.commit()
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python -m app.cli create-user <email> <password>")
         print("  python -m app.cli generate-recurring")
         print("  python -m app.cli categorisation-backtest [workspace_id]")
+        print("  python -m app.cli connections-backfill <connection_id>")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -133,11 +186,16 @@ def main() -> None:
         asyncio.run(
             categorisation_backtest(sys.argv[2] if len(sys.argv) > 2 else None)
         )
+    elif command == "connections-backfill":
+        if len(sys.argv) != 3:
+            print("Usage: python -m app.cli connections-backfill <connection_id>")
+            sys.exit(1)
+        asyncio.run(connections_backfill(sys.argv[2]))
     else:
         print(f"Unknown command: {command}")
         print(
             "Available commands: create-user, generate-recurring,"
-            " categorisation-backtest"
+            " categorisation-backtest, connections-backfill"
         )
         sys.exit(1)
 

@@ -913,10 +913,110 @@ async def test_sync_connection_backfills_an_account_added_after_the_connection(
         call.args[1]: call.args[2]
         for call in mock_provider.get_transactions.call_args_list
     }
-    # No history yet means no window: ask for everything the provider has.
-    assert since_by_account["late-acc-new"] is None
+    # No history yet means "everything", and that has to be said with a date:
+    # `since=None` is the provider's own default window, which is a year for
+    # Akahu, so asking with None imported twelve months and called it history.
+    # Asserted as a shape rather than against the constant, so the test fails
+    # if that constant ever goes back to being falsy.
+    new_since = since_by_account["late-acc-new"]
+    assert new_since is not None
+    assert new_since <= date(2001, 1, 1)
     # An account we have already synced keeps the incremental 14-day rewind.
-    assert since_by_account["late-acc-known"] is not None
+    known_since = since_by_account["late-acc-known"]
+    assert known_since is not None
+    assert known_since > date(2001, 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_an_opening_balance_is_not_bank_history(
+    session: AsyncSession, test_user, test_workspace,
+):
+    """Our own opening-balance row must not make an account look synced.
+
+    The row is created by this app, not by the bank. Counting it as history
+    meant an account holding only its opening balance was asked for the last
+    14 days from then on, permanently excluding everything older - including
+    transactions the bank only begins returning later.
+    """
+    conn = await _make_connection(session, test_user.id, "Fresh Card Bank")
+
+    account_data = AccountData(
+        external_id="card-no-history", name="New Card", type="credit_card",
+        balance=Decimal("0"), currency="BRL",
+    )
+
+    mock_provider = AsyncMock()
+    mock_provider.refresh_credentials = AsyncMock(return_value={"token": "refreshed"})
+    mock_provider.get_accounts = AsyncMock(return_value=[account_data])
+    mock_provider.get_transactions = AsyncMock(return_value=[])
+
+    with patch("app.services.connection_service.get_provider", return_value=mock_provider), \
+         patch("app.services.connection_service.detect_transfer_pairs", new_callable=AsyncMock), \
+         patch("app.services.connection_service.stamp_primary_amount", new_callable=AsyncMock), \
+         patch("app.services.connection_service.apply_rules_to_transaction", new_callable=AsyncMock):
+        await sync_connection(session, conn.id, test_workspace.id, test_user.id)
+
+        account = (
+            await session.execute(
+                select(Account).where(Account.external_id == "card-no-history")
+            )
+        ).scalar_one()
+        session.add(
+            Transaction(
+                id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+                account_id=account.id, description="Saldo inicial",
+                amount=Decimal("1669.47"), currency="BRL", date=date.today(),
+                effective_date=date.today(), type="credit", source="opening_balance",
+                status="posted",
+            )
+        )
+        await session.flush()
+        mock_provider.get_transactions.reset_mock()
+
+        await sync_connection(session, conn.id, test_workspace.id, test_user.id)
+
+    since = mock_provider.get_transactions.call_args.args[2]
+    assert since is not None
+    assert since <= date(2001, 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_full_history_ignores_the_incremental_window(
+    session: AsyncSession, test_user, test_workspace,
+):
+    """A backfill asks again for what an earlier narrow window skipped past."""
+    conn = await _make_connection(session, test_user.id, "Backfill Bank")
+    conn.last_sync_at = datetime.now(timezone.utc)
+    await session.flush()
+
+    known = AccountData(
+        external_id="established", name="Main", type="checking",
+        balance=Decimal("100"), currency="BRL",
+    )
+
+    mock_provider = AsyncMock()
+    mock_provider.refresh_credentials = AsyncMock(return_value={"token": "refreshed"})
+    mock_provider.get_accounts = AsyncMock(return_value=[known])
+    mock_provider.get_transactions = AsyncMock(return_value=[
+        TransactionData(
+            external_id="established-tx", description="COFFEE",
+            amount=Decimal("5"), date=date.today(), type="debit", currency="BRL",
+        ),
+    ])
+
+    with patch("app.services.connection_service.get_provider", return_value=mock_provider), \
+         patch("app.services.connection_service.detect_transfer_pairs", new_callable=AsyncMock), \
+         patch("app.services.connection_service.stamp_primary_amount", new_callable=AsyncMock), \
+         patch("app.services.connection_service.apply_rules_to_transaction", new_callable=AsyncMock):
+        await sync_connection(session, conn.id, test_workspace.id, test_user.id)
+        mock_provider.get_transactions.reset_mock()
+        await sync_connection(
+            session, conn.id, test_workspace.id, test_user.id, full_history=True
+        )
+
+    since = mock_provider.get_transactions.call_args.args[2]
+    assert since is not None
+    assert since <= date(2001, 1, 1), "a backfill must ignore the incremental window"
 
 
 @pytest.mark.asyncio

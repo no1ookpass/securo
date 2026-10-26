@@ -60,6 +60,17 @@ logger = logging.getLogger(__name__)
 
 LOCAL_IMPORT_SOURCES = {"import", "csv", "ofx", "qif", "camt"}
 
+#: "Everything the provider has", as a date.
+#:
+#: `since=None` does *not* mean this. Each provider falls back to its own
+#: default window - Akahu's is a year (`AKAHU_DEFAULT_HISTORY_DAYS`) - so the
+#: old `since=None` for a newly added account quietly imported twelve months
+#: and called it history. On 2026-10-27 that left 404 provider transactions
+#: unimported across one Kiwibank connection, every one of them older than the
+#: window. Passing a date far enough back is unambiguous and needs no provider
+#: to change its fallback.
+FULL_HISTORY_SINCE = date(2000, 1, 1)
+
 settings = get_settings()
 
 _PROVIDER_SELL_DATE_METADATA_KEY = "_securo_provider_sell_date"
@@ -1179,9 +1190,10 @@ async def handle_oauth_callback(
             session, user_id, account, provider, connection_data.credentials
         )
 
-        # Fetch initial transactions (since=None fetches all available history)
+        # Fetch initial transactions. Not `since=None`: that is the provider's
+        # default window (a year for Akahu), not all the history it holds.
         transactions_data = await provider.get_transactions(
-            connection_data.credentials, acc_data.external_id, None
+            connection_data.credentials, acc_data.external_id, FULL_HISTORY_SINCE
         )
         incoming_external_ids = {txn.external_id for txn in transactions_data}
         seen_external_ids: set[str] = set()
@@ -2014,7 +2026,16 @@ async def sync_connection(
     workspace_id: uuid.UUID,
     requesting_user_id: uuid.UUID,
     trigger_provider_refresh: bool = False,
+    full_history: bool = False,
 ) -> tuple[BankConnection, int, SyncOutcome]:
+    """Sync one connection.
+
+    ``full_history`` re-reads every account from :data:`FULL_HISTORY_SINCE`
+    instead of the incremental window. It exists for accounts that were first
+    imported under a narrower window and can never catch up on their own: an
+    ordinary sync only looks back far enough to pick up what changed since the
+    last one, so history the window already passed is invisible to it forever.
+    """
     connection = await get_connection(
         session, connection_id, workspace_id, for_update=True
     )
@@ -2257,20 +2278,32 @@ async def sync_connection(
             # the previous sync. Ask for everything it has instead; an account
             # that is genuinely empty costs one request per sync and starts
             # backfilling the moment it has any history.
+            # An opening balance is a row this app created, not something the
+            # bank ever sent, so it says nothing about whether this account has
+            # been synced. Counting it meant an account holding only its
+            # opening balance was treated as known and thereafter asked for the
+            # last 14 days - which is how a card with no transactions yet would
+            # stay empty even after its bank started returning some.
             has_history = (
                 await session.scalar(
                     select(Transaction.id)
-                    .where(Transaction.account_id == account.id)
+                    .where(
+                        Transaction.account_id == account.id,
+                        Transaction.source != "opening_balance",
+                    )
                     .limit(1)
                 )
             ) is not None
             since = (
                 connection.last_sync_at.date() - timedelta(days=14)
-                if connection.last_sync_at and has_history
-                else None
+                if connection.last_sync_at and has_history and not full_history
+                else FULL_HISTORY_SINCE
             )
             transactions_data = await provider.get_transactions(
-                credentials, acc_data.external_id, since, payee_source=payee_source
+                credentials,
+                acc_data.external_id,
+                since,
+                payee_source=payee_source,
             )
 
             # Every id the provider returned, pending ones included, so the
