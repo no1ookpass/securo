@@ -1211,7 +1211,8 @@ export default function TransactionsPage() {
                   <Sparkles className="h-3 w-3" />
                   {t('transactions.categorySuggestion', {
                     category: suggestion.category_name,
-                    confidence: Math.round(suggestion.confidence * 100),
+                    agreed: suggestion.agreed,
+                    evidence: suggestion.evidence,
                   })}
                   <button
                     type="button"
@@ -1512,6 +1513,16 @@ export default function TransactionsPage() {
           />
         }
       />
+
+      <div className="flex justify-end">
+        <Link
+          to="/transactions/review-categories"
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {t('transactions.reviewCategories')}
+        </Link>
+      </div>
 
       {/* Filters */}
       <TransactionsFilterBar

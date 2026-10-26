@@ -101,11 +101,18 @@ retrain or invalidate.
 
 Guards, none of which were guesses:
 
-- `MIN_EVIDENCE = 3` decisions and `MIN_SHARE = 0.8` agreement before anything is
-  suggested. Below that the memory emits nothing rather than a coin toss.
+- `MIN_EVIDENCE = 2` decisions and `MIN_SHARE = 0.6` agreement before anything is
+  suggested. This is a clear-majority rule, not a purity rule: a merchant with two
+  legitimate uses (Bunnings is mostly Homeware, occasionally a child's own purchase at
+  the same shop) should still suggest its majority. A tie stays below 0.6 and abstains.
+  The UI shows the split (`2/3`) rather than a percentage, so a thin guess cannot be
+  mistaken for a pattern - and 100% everywhere was an artefact of unanimous history.
 - A token seen under more than one payee is not evidence (`MAX_TOKEN_PAYEES = 1`).
   Without it, `warehouse` voted Groceries for Bunnings because The Warehouse's history
-  is mostly groceries.
+  is mostly groceries. The payee set is built from **every** descriptor in the
+  workspace, categorised or not: `beach` appeared under a single payee among labelled
+  rows and voted Groceries for a Mobil charge at the same beach, until uncategorised
+  rows were counted too.
 - Noise tokens learned from the backtest, not from taste: `tfr` (suggested Education
   for rent transfers), `online` (Groceries for a DIY store), reference codes shaped
   like `fc02`, and plain English words.
@@ -155,12 +162,19 @@ This is the natural answer to the coverage gap: merchants with one or two decisi
 
 ### UI
 
+- **Review queue (implemented)** at `/transactions/review-categories`, reached from the
+  transactions page. Every uncategorised row the memory can file, best-supported first,
+  with the evidence and an accept-all per merchant - clearing nine Rothbury rows is one
+  decision, not nine. Without it, suggestions existed only on whichever page happened to
+  contain the row, which is useless for a 743-row backlog.
 - A suggestion chip on the transaction row: proposed category, confidence, and the
   evidence ("12 similar, 11 agreed"), with accept and dismiss.
-- A review queue reusing the reconciliation queue pattern.
 - A "learned merchants" list — merchant, category, vote counts — that can be corrected
   in one click. This is the audit surface, and it replaces per-merchant rules.
 - The import preview shows suggestions as an unselected hint, never a default.
+
+Dismissals are session-only for now; remembering them needs the suggestion table from
+Phase 0.
 
 ### Measurement
 

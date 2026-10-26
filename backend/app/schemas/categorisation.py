@@ -6,6 +6,8 @@ that already requires a human.
 """
 
 import uuid
+from datetime import date
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel
@@ -19,9 +21,21 @@ class CategorisationSuggestionRead(BaseModel):
     category_name: str
     #: Share of the supporting decisions that agree, 0..1.
     confidence: float
-    #: How many earlier decisions the proposal rests on.
+    #: How many earlier decisions the proposal rests on, and how many agree. The
+    #: pair reads as "2 of 3", which is more honest than a bare percentage.
     evidence: int
+    agreed: int
     #: Which index spoke: the merchant entity, or a description token.
     source: Literal["payee", "description"]
     #: The payee name or the token that matched, for showing its origin.
     matched: str
+
+
+class CategorisationQueueItemRead(CategorisationSuggestionRead):
+    """A suggestion plus the row it belongs to, for the review queue."""
+
+    description: str
+    date: date
+    amount: Decimal
+    currency: str
+    account_name: str

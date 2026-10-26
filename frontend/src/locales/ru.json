@@ -1166,11 +1166,12 @@
     "invoiceBadgeTooltip": "Эта операция закрывает счёт. Открыть.",
     "suggestionBadge": "Вопрос",
     "suggestionBadgeTooltip": "Платёж может закрыть этот счёт. Откройте очередь, чтобы ответить.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Предложено на основе {{count}} предыдущих решений для {{matched}}. Не применяется до подтверждения.",
     "categorySuggestionAccept": "Принять предложенную категорию",
     "categorySuggestionDismiss": "Отклонить предложение",
-    "clearGroupFilter": "Сбросить фильтр группы"
+    "clearGroupFilter": "Сбросить фильтр группы",
+    "reviewCategories": "Проверить категории"
   },
   "accounts": {
     "title": "Счета",
@@ -3007,5 +3008,12 @@
       "recurring": "Правила повторяющихся",
       "recurringHint": "Как мы решаем, что списание — это счёт, который вы уже ждали."
     }
+  },
+  "categorisation": {
+    "title": "Проверить категории",
+    "subtitle": "Строки, которые ваша история может разнести по категориям. Ничего не изменится, пока вы не подтвердите.",
+    "empty": "Сейчас нечего проверять.",
+    "acceptAll": "Принять все {{count}}",
+    "accepted": "{{count}} распределено"
   }
 }

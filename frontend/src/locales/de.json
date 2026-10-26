@@ -1152,11 +1152,12 @@
     "invoiceBadgeTooltip": "Diese Transaktion begleicht eine Rechnung. Öffnen.",
     "suggestionBadge": "Frage",
     "suggestionBadgeTooltip": "Eine Zahlung könnte diese Rechnung begleichen. Öffnen Sie die Warteschlange.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Vorschlag aus {{count}} früheren Entscheidungen für {{matched}}. Wird erst nach Bestätigung angewendet.",
     "categorySuggestionAccept": "Vorgeschlagene Kategorie übernehmen",
     "categorySuggestionDismiss": "Vorschlag verwerfen",
-    "clearGroupFilter": "Gruppenfilter entfernen"
+    "clearGroupFilter": "Gruppenfilter entfernen",
+    "reviewCategories": "Kategorien prüfen"
   },
   "accounts": {
     "title": "Konten",
@@ -2989,5 +2990,12 @@
       "recurring": "Regeln für Wiederkehrendes",
       "recurringHint": "Wie wir entscheiden, dass eine Buchung die erwartete Rechnung ist."
     }
+  },
+  "categorisation": {
+    "title": "Kategorien prüfen",
+    "subtitle": "Zeilen, die deine Historie einsortieren kann. Nichts ändert sich, bis du bestätigst.",
+    "empty": "Im Moment nichts zu prüfen.",
+    "acceptAll": "Alle {{count}} übernehmen",
+    "accepted": "{{count}} kategorisiert"
   }
 }

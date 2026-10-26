@@ -37,18 +37,23 @@ from typing import Iterable, Literal, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
 
-#: Decisions about a key before it may suggest anything at all. One or two rows
-#: are an anecdote, not a pattern.
-MIN_EVIDENCE = 3
-#: Share of those decisions the winning category must hold. Below this the
-#: memory abstains rather than showing a coin toss.
-MIN_SHARE = 0.8
+#: Decisions about a key before it may suggest anything at all. One is an
+#: anecdote; two is a repeat, which is the point at which "last time it was X"
+#: becomes a fair guess.
+MIN_EVIDENCE = 2
+#: Share of those decisions the winning category must hold. This is a
+#: clear-majority rule, not a purity rule: a merchant with two legitimate uses
+#: (Bunnings is mostly Homeware, occasionally a child's own purchase) should
+#: still suggest its majority, and the count is shown so a 2-of-3 guess cannot
+#: be mistaken for a pattern. A tie (1-1, 3-3) stays below this and abstains.
+MIN_SHARE = 0.6
 
 #: Thresholds reported by the backtest so the defaults can be chosen from data.
-BACKTEST_THRESHOLDS: tuple[tuple[int, float], ...] = ((2, 0.7), (3, 0.8), (5, 0.9))
+BACKTEST_THRESHOLDS: tuple[tuple[int, float], ...] = ((1, 0.6), (2, 0.6), (3, 0.8))
 
 #: How many different payees a token may appear under before it stops counting as
 #: evidence. One is the useful case: "woolworths" only ever showed up under the
@@ -148,6 +153,25 @@ class CategoryMemory:
             self._by_token.setdefault(token, Counter())[category_id] += 1
             self._token_payees.setdefault(token, set()).add(payee_id)
 
+    def observe(
+        self,
+        *,
+        payee_id: Optional[uuid.UUID],
+        description: Optional[str],
+    ) -> None:
+        """Note that a descriptor exists, without treating it as a decision.
+
+        Token ambiguity has to be judged against everything the workspace has,
+        not only what it has categorised. "beach" appeared under a single payee
+        among labelled rows (a supermarket whose descriptor happens to name the
+        suburb), so it was treated as distinctive and voted Groceries for a
+        Mobil charge at the same beach. Seeing every descriptor closes that gap:
+        a word that turns up under more than one merchant anywhere is not
+        evidence about either of them.
+        """
+        for token in normalise_tokens(description):
+            self._token_payees.setdefault(token, set()).add(payee_id)
+
     def __len__(self) -> int:
         return sum(sum(c.values()) for c in self._by_payee.values())
 
@@ -230,7 +254,10 @@ class GradedTransaction:
     category_id: uuid.UUID
     category_name: str
     confidence: float
+    #: Decisions backing the proposal, and how many of them agree. The pair is
+    #: what the UI shows as "2 of 3", which says more than a percentage.
     evidence: int
+    agreed: int
     source: Literal["payee", "description"]
     matched: str
 
@@ -294,6 +321,7 @@ async def grade_uncategorised(
                 category_name="",
                 confidence=suggestion.confidence,
                 evidence=suggestion.evidence,
+                agreed=suggestion.votes.get(suggestion.category_id, 0),
                 source=suggestion.source,
                 matched=suggestion.matched,
             )
@@ -316,11 +344,122 @@ async def grade_uncategorised(
             category_name=names.get(g.category_id, ""),
             confidence=g.confidence,
             evidence=g.evidence,
+            agreed=g.agreed,
             source=g.source,
             matched=g.matched,
         )
         for g in graded
     ]
+
+
+@dataclass(frozen=True)
+class QueueItem:
+    """One row of the review queue: the transaction and its proposal."""
+
+    transaction_id: uuid.UUID
+    description: str
+    date: object
+    amount: object
+    currency: str
+    account_name: str
+    category_id: uuid.UUID
+    category_name: str
+    confidence: float
+    evidence: int
+    agreed: int
+    source: Literal["payee", "description"]
+    matched: str
+
+
+async def grade_queue(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    *,
+    limit: int = 200,
+    min_evidence: int = MIN_EVIDENCE,
+    min_share: float = MIN_SHARE,
+) -> list[QueueItem]:
+    """Everything the workspace could categorise now, best-supported first.
+
+    The same grading as :func:`grade_uncategorised`, but it returns the whole
+    row so a review page can render it without a second query, and it sorts by
+    evidence so the merchants with the most history come first - that is the
+    order a person clears a backlog in, one merchant at a time.
+    """
+    candidates = (
+        await session.execute(
+            select(
+                Transaction.id,
+                Transaction.description,
+                Transaction.date,
+                Transaction.amount,
+                Transaction.currency,
+                Transaction.payee_id,
+                Transaction.payee,
+                Account.name,
+            )
+            .join(Account, Account.id == Transaction.account_id)
+            .where(
+                Transaction.workspace_id == workspace_id,
+                Transaction.category_id.is_(None),
+                Transaction.is_ignored.is_(False),
+                Transaction.source != "opening_balance",
+            )
+            .order_by(Transaction.date.desc(), Transaction.id)
+            .limit(limit)
+        )
+    ).all()
+    if not candidates:
+        return []
+
+    memory = await load_memory(session, workspace_id)
+
+    proposed: list[tuple[object, Suggestion]] = []
+    for row in candidates:
+        suggestion = memory.suggest(
+            payee_id=row.payee_id,
+            description=row.description,
+            payee_name=row.payee,
+            min_evidence=min_evidence,
+            min_share=min_share,
+        )
+        if suggestion is not None:
+            proposed.append((row, suggestion))
+    if not proposed:
+        return []
+
+    names = {
+        category.id: category.name
+        for category in await session.execute(
+            select(Category.id, Category.name).where(
+                Category.id.in_({s.category_id for _, s in proposed})
+            )
+        )
+    }
+    items = [
+        QueueItem(
+            transaction_id=row.id,
+            description=row.description,
+            date=row.date,
+            amount=row.amount,
+            currency=row.currency,
+            account_name=row.name,
+            category_id=suggestion.category_id,
+            category_name=names.get(suggestion.category_id, ""),
+            confidence=suggestion.confidence,
+            evidence=suggestion.evidence,
+            agreed=suggestion.votes.get(suggestion.category_id, 0),
+            source=suggestion.source,
+            matched=suggestion.matched,
+        )
+        for row, suggestion in proposed
+    ]
+    # Most-supported first, then the strongest agreement, then newest.
+    return sorted(
+        items,
+        key=lambda item: (item.evidence, item.confidence, item.date),
+        reverse=True,
+    )
 
 
 async def load_memory(
@@ -363,6 +502,21 @@ async def load_memory(
             payee_id=row.payee_id,
             description=row.description,
         )
+
+    # Second pass over every descriptor in the workspace, categorised or not,
+    # so token ambiguity reflects the real merchant vocabulary rather than the
+    # subset that happens to have a category.
+    seen = (
+        await session.execute(
+            select(Transaction.payee_id, Transaction.description).where(
+                Transaction.workspace_id == workspace_id,
+                Transaction.source != "opening_balance",
+            )
+        )
+    ).all()
+    for row in seen:
+        memory.observe(payee_id=row.payee_id, description=row.description)
+
     return memory
 
 

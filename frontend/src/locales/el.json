@@ -1352,11 +1352,12 @@
     "invoiceBadgeTooltip": "Αυτή η συναλλαγή εξοφλεί ένα τιμολόγιο. Ανοίξτε το.",
     "suggestionBadge": "Ερώτηση",
     "suggestionBadgeTooltip": "Μια πληρωμή μπορεί να εξοφλεί ένα τιμολόγιο. Ανοίξτε την ουρά για να απαντήσετε.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Πρόταση από {{count}} προηγούμενες αποφάσεις για {{matched}}. Δεν εφαρμόζεται μέχρι να την αποδεχτείτε.",
     "categorySuggestionAccept": "Αποδοχή προτεινόμενης κατηγορίας",
     "categorySuggestionDismiss": "Απόρριψη πρότασης",
-    "clearGroupFilter": "Κατάργηση φίλτρου ομάδας"
+    "clearGroupFilter": "Κατάργηση φίλτρου ομάδας",
+    "reviewCategories": "Έλεγχος κατηγοριών"
   },
   "budgets": {
     "title": "Προϋπολογισμοί",
@@ -2988,5 +2989,12 @@
       "recurring": "Κανόνες Επαναλαμβανόμενων",
       "recurringHint": "Πώς αποφασίζουμε ότι μια χρέωση είναι ο λογαριασμός που ήδη περιμένατε."
     }
+  },
+  "categorisation": {
+    "title": "Έλεγχος κατηγοριών",
+    "subtitle": "Γραμμές που μπορεί να ταξινομήσει το ιστορικό σας. Τίποτα δεν αλλάζει μέχρι να αποδεχτείτε.",
+    "empty": "Δεν υπάρχει τίποτα για έλεγχο αυτή τη στιγμή.",
+    "acceptAll": "Αποδοχή και των {{count}}",
+    "accepted": "{{count}} κατηγοριοποιήθηκαν"
   }
 }

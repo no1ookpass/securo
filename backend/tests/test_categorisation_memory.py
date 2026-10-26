@@ -160,6 +160,31 @@ def test_a_token_shared_by_two_merchants_is_not_evidence():
     assert memory.suggest(description="THE WAREHOUSE WHANGAREI") is None
 
 
+def test_a_token_seen_under_another_merchant_in_any_row_is_not_evidence():
+    """`beach` belongs to a suburb, not to the supermarket that names it.
+
+    It appeared under one payee among *categorised* rows, so the gate treated it
+    as distinctive and suggested Groceries for a Mobil charge at the same beach.
+    Descriptors that were never categorised still prove a word is not exclusive
+    to one merchant.
+    """
+    memory = CategoryMemory()
+    groceries = uuid.uuid4()
+    four_square, mobil = uuid.UUID(int=40), uuid.UUID(int=41)
+
+    for _ in range(3):
+        memory.add(
+            groceries, payee_id=four_square,
+            description="FOUR SQUARE RED BEACH RED BEACH",
+        )
+    # Seen, never categorised: no category evidence, but a second merchant.
+    memory.observe(payee_id=mobil, description="MOBIL RED BEACH RED BEACH")
+
+    assert memory.suggest(description="MOBIL RED BEACH RED BEACH") is None
+    # The merchant that is genuinely unique still resolves.
+    assert memory.suggest(description="FOUR SQUARE RED BEACH").category_id == groceries
+
+
 def test_a_token_seen_under_one_merchant_still_works():
     memory = CategoryMemory()
     groceries = uuid.uuid4()
@@ -335,3 +360,30 @@ async def test_backtest_grades_each_row_against_earlier_decisions_only(
     assert strict.suggested >= 1
     assert strict.correct == strict.suggested
     assert strict.precision == 1.0
+
+
+@pytest.mark.asyncio
+async def test_load_memory_reads_token_ambiguity_from_uncategorised_rows(
+    session: AsyncSession, test_user, test_workspace,
+):
+    """The Mobil-at-the-same-beach case, end to end through the loader."""
+    groceries = await _category(session, test_workspace.id, test_user.id, "Groceries")
+    for i in range(3):
+        await _seed(
+            session, test_workspace.id, test_user.id,
+            payee_name="Four Square",
+            description="FOUR SQUARE RED BEACH RED BEACH",
+            category=groceries, when=BASE + timedelta(days=i),
+        )
+    # A fuel station at the same beach, never categorised.
+    mobil = await _seed(
+        session, test_workspace.id, test_user.id,
+        payee_name="Mobil",
+        description="MOBIL RED BEACH RED BEACH",
+        category=groceries, when=BASE + timedelta(days=5),
+    )
+    mobil.category_id = None
+    await session.commit()
+
+    memory = await load_memory(session, test_workspace.id)
+    assert memory.suggest(description="MOBIL RED BEACH RED BEACH") is None

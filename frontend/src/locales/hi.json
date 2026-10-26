@@ -1152,11 +1152,12 @@
     "invoiceBadgeTooltip": "यह लेन-देन एक इनवॉइस चुकाता है। इसे खोलें।",
     "suggestionBadge": "सवाल",
     "suggestionBadgeTooltip": "एक भुगतान इसे चुका सकता है। जवाब देने के लिए कतार खोलें।",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "{{matched}} के लिए {{count}} पिछले निर्णयों से सुझाव। स्वीकार करने तक लागू नहीं होगा।",
     "categorySuggestionAccept": "सुझाई गई श्रेणी स्वीकार करें",
     "categorySuggestionDismiss": "सुझाव खारिज करें",
-    "clearGroupFilter": "समूह फ़िल्टर हटाएँ"
+    "clearGroupFilter": "समूह फ़िल्टर हटाएँ",
+    "reviewCategories": "श्रेणियाँ जाँचें"
   },
   "accounts": {
     "title": "खाते",
@@ -2988,5 +2989,12 @@
       "recurring": "आवर्ती नियम",
       "recurringHint": "हम कैसे तय करते हैं कि कोई शुल्क वही बिल है जिसकी आप पहले से अपेक्षा कर रहे थे।"
     }
+  },
+  "categorisation": {
+    "title": "श्रेणियाँ जाँचें",
+    "subtitle": "वे पंक्तियाँ जिन्हें आपका इतिहास वर्गीकृत कर सकता है। स्वीकार करने तक कुछ नहीं बदलेगा।",
+    "empty": "अभी जाँचने के लिए कुछ नहीं है।",
+    "acceptAll": "सभी {{count}} स्वीकार करें",
+    "accepted": "{{count}} वर्गीकृत किए गए"
   }
 }

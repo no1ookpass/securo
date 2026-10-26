@@ -1220,11 +1220,12 @@
     "invoiceBadgeTooltip": "Tato transakce vyrovnává fakturu. Otevřete ji.",
     "suggestionBadge": "Otázka",
     "suggestionBadgeTooltip": "Platba může uhradit tuto fakturu. Otevřete frontu a odpovězte.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Návrh z {{count}} předchozích rozhodnutí pro {{matched}}. Nepoužije se, dokud jej neschválíte.",
     "categorySuggestionAccept": "Přijmout navrženou kategorii",
     "categorySuggestionDismiss": "Zamítnout návrh",
-    "clearGroupFilter": "Zrušit filtr skupiny"
+    "clearGroupFilter": "Zrušit filtr skupiny",
+    "reviewCategories": "Zkontrolovat kategorie"
   },
   "accounts": {
     "title": "Účty",
@@ -3150,5 +3151,12 @@
       "recurring": "Pravidla opakovaných plateb",
       "recurringHint": "Jak určujeme, že odepsaná částka je účet, který jste už očekávali."
     }
+  },
+  "categorisation": {
+    "title": "Zkontrolovat kategorie",
+    "subtitle": "Řádky, které může vaše historie zařadit. Nic se nezmění, dokud neschválíte.",
+    "empty": "Nyní není co kontrolovat.",
+    "acceptAll": "Přijmout všech {{count}}",
+    "accepted": "{{count}} zařazeno"
   }
 }

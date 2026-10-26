@@ -1152,11 +1152,12 @@
     "invoiceBadgeTooltip": "この取引は請求書を決済しています。開く。",
     "suggestionBadge": "要確認",
     "suggestionBadgeTooltip": "これが何かを消し込む可能性があります。キューを開いて回答してください。",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "{{matched}} に対する過去 {{count}} 件の判断からの提案です。承認するまで適用されません。",
     "categorySuggestionAccept": "提案されたカテゴリを承認",
     "categorySuggestionDismiss": "提案を却下",
-    "clearGroupFilter": "グループフィルターを解除"
+    "clearGroupFilter": "グループフィルターを解除",
+    "reviewCategories": "カテゴリを確認"
   },
   "accounts": {
     "title": "口座",
@@ -2988,5 +2989,12 @@
       "recurring": "定期のルール",
       "recurringHint": "ある引き落としが予定していた支払いだと判断する方法。"
     }
+  },
+  "categorisation": {
+    "title": "カテゴリを確認",
+    "subtitle": "これまでの履歴から分類できる行です。承認するまで何も変わりません。",
+    "empty": "確認する項目はありません。",
+    "acceptAll": "{{count}} 件をすべて承認",
+    "accepted": "{{count}} 件を分類しました"
   }
 }

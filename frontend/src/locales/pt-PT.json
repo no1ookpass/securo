@@ -1154,11 +1154,12 @@
     "invoiceBadgeTooltip": "Esta transação quita uma cobrança. Abrir.",
     "suggestionBadge": "Pergunta",
     "suggestionBadgeTooltip": "Um pagamento pode liquidar esta cobrança. Abra a fila para responder.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Sugerido a partir de {{count}} decisões anteriores para {{matched}}. Só é aplicado depois de aceitar.",
     "categorySuggestionAccept": "Aceitar a categoria sugerida",
     "categorySuggestionDismiss": "Dispensar a sugestão",
-    "clearGroupFilter": "Limpar filtro de grupo"
+    "clearGroupFilter": "Limpar filtro de grupo",
+    "reviewCategories": "Rever categorias"
   },
   "accounts": {
     "title": "Contas",
@@ -2992,5 +2993,12 @@
       "recurring": "Regras de Recorrentes",
       "recurringHint": "Como decidimos que uma cobrança é a conta que já esperava."
     }
+  },
+  "categorisation": {
+    "title": "Rever categorias",
+    "subtitle": "Linhas que o seu histórico pode classificar. Nada muda até aceitar.",
+    "empty": "Nada para rever neste momento.",
+    "acceptAll": "Aceitar todas as {{count}}",
+    "accepted": "{{count}} categorizadas"
   }
 }

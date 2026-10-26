@@ -1166,11 +1166,12 @@
     "invoiceBadgeTooltip": "Ця операція закриває рахунок. Відкрити.",
     "suggestionBadge": "Питання",
     "suggestionBadgeTooltip": "Платіж може закрити цей рахунок. Відкрийте чергу, щоб відповісти.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Запропоновано на основі {{count}} попередніх рішень для {{matched}}. Не застосовується до підтвердження.",
     "categorySuggestionAccept": "Прийняти запропоновану категорію",
     "categorySuggestionDismiss": "Відхилити пропозицію",
-    "clearGroupFilter": "Скинути фільтр групи"
+    "clearGroupFilter": "Скинути фільтр групи",
+    "reviewCategories": "Перевірити категорії"
   },
   "accounts": {
     "title": "Рахунки",
@@ -3007,5 +3008,12 @@
       "recurring": "Правила повторюваних",
       "recurringHint": "Як ми визначаємо, що списання — це рахунок, на який ви вже чекали."
     }
+  },
+  "categorisation": {
+    "title": "Перевірити категорії",
+    "subtitle": "Рядки, які ваша історія може розподілити. Нічого не зміниться, доки ви не підтвердите.",
+    "empty": "Зараз немає чого перевіряти.",
+    "acceptAll": "Прийняти всі {{count}}",
+    "accepted": "{{count}} розподілено"
   }
 }

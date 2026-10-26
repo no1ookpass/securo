@@ -21,6 +21,7 @@ import type {
   AccountRunningBalancePoint,
   Collection,
   CreditCardBill,
+  CategorisationQueueItem,
   CategorisationSuggestion,
   DescriptionSuggestion,
   Transaction,
@@ -353,6 +354,12 @@ export const categorisation = {
       params: { transaction_ids: transactionIds, limit },
       paramsSerializer: { indexes: null },
     })
+    return data
+  },
+  /** Every uncategorised row the memory can propose something for, best
+   *  supported first, with the row itself so the queue renders in one request. */
+  queue: async (limit = 200): Promise<CategorisationQueueItem[]> => {
+    const { data } = await api.get('/categorisation/queue', { params: { limit } })
     return data
   },
 }

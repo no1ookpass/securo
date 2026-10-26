@@ -10,7 +10,6 @@ from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.account import Account
@@ -285,3 +284,152 @@ async def test_without_ids_it_grades_the_newest_uncategorised_rows(
     assert response.status_code == 200
     assert len(response.json()) == 2
     assert {row["category_name"] for row in response.json()} == {"Groceries"}
+
+
+@pytest.mark.asyncio
+async def test_a_merchant_with_two_legitimate_uses_suggests_its_majority(
+    session: AsyncSession, client: AsyncClient, auth_headers: dict,
+    test_user, test_workspace,
+):
+    """Bunnings is mostly Homeware, occasionally a child's own purchase.
+
+    The old 80% purity floor abstained forever at 2-of-3. A clear majority with
+    the split shown is the better answer: it is a suggestion, and the count
+    tells you how thin it is.
+    """
+    account = await _account(session, test_workspace.id, test_user.id)
+    homeware = await _category(session, test_workspace.id, test_user.id, "Homeware")
+    splash = await _category(session, test_workspace.id, test_user.id, "Hayden Splash")
+    bunnings = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Bunnings Warehouse", source="sync",
+    )
+    session.add(bunnings)
+    await session.flush()
+
+    for i, category in enumerate((homeware, homeware, splash)):
+        await _transaction(
+            session, account=account, user_id=test_user.id,
+            workspace_id=test_workspace.id, payee=bunnings,
+            description=f"BUNNINGS WAREHOUSE STORE {i}", category=category,
+            when=BASE + timedelta(days=i),
+        )
+    pending = await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=bunnings,
+        description="BUNNINGS WAREHOUSE ALBANY", category=None,
+        when=BASE + timedelta(days=10),
+    )
+    await session.commit()
+
+    response = await client.get(
+        "/api/categorisation/suggestions",
+        params={"transaction_ids": str(pending.id)},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["category_name"] == "Homeware"
+    assert body[0]["agreed"] == 2
+    assert body[0]["evidence"] == 3
+    assert round(body[0]["confidence"], 2) == 0.67
+
+
+@pytest.mark.asyncio
+async def test_a_tie_still_abstains(session: AsyncSession, client: AsyncClient, auth_headers: dict,
+                                   test_user, test_workspace):
+    """Two uses in equal measure is not a habit; say nothing."""
+    account = await _account(session, test_workspace.id, test_user.id)
+    homeware = await _category(session, test_workspace.id, test_user.id, "Homeware")
+    splash = await _category(session, test_workspace.id, test_user.id, "Hayden Splash")
+    payee = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Bunnings Warehouse", source="sync",
+    )
+    session.add(payee)
+    await session.flush()
+
+    for i, category in enumerate((homeware, splash)):
+        await _transaction(
+            session, account=account, user_id=test_user.id,
+            workspace_id=test_workspace.id, payee=payee,
+            description=f"BUNNINGS WAREHOUSE STORE {i}", category=category,
+            when=BASE + timedelta(days=i),
+        )
+    pending = await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=payee,
+        description="BUNNINGS WAREHOUSE ALBANY", category=None,
+        when=BASE + timedelta(days=10),
+    )
+    await session.commit()
+
+    response = await client.get(
+        "/api/categorisation/suggestions",
+        params={"transaction_ids": str(pending.id)},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_the_queue_returns_whole_rows_most_supported_first(
+    session: AsyncSession, client: AsyncClient, auth_headers: dict,
+    test_user, test_workspace,
+):
+    account = await _account(session, test_workspace.id, test_user.id)
+    groceries = await _category(session, test_workspace.id, test_user.id, "Groceries")
+    fuel = await _category(session, test_workspace.id, test_user.id, "Transport")
+    woolworths = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Woolworths", source="sync",
+    )
+    gull = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Gull", source="sync",
+    )
+    session.add_all([woolworths, gull])
+    await session.flush()
+
+    for i in range(4):
+        await _transaction(
+            session, account=account, user_id=test_user.id,
+            workspace_id=test_workspace.id, payee=woolworths,
+            description=f"WOOLWORTHS NZ/STORE {i}", category=groceries,
+            when=BASE + timedelta(days=i),
+        )
+    for i in range(2):
+        await _transaction(
+            session, account=account, user_id=test_user.id,
+            workspace_id=test_workspace.id, payee=gull,
+            description=f"GULL STATION {i}", category=fuel,
+            when=BASE + timedelta(days=i),
+        )
+    recent = await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=gull,
+        description="GULL PUKEKOHE", category=None, when=BASE + timedelta(days=20),
+    )
+    await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=woolworths,
+        description="Woolworths Online Favona", category=None,
+        when=BASE + timedelta(days=21),
+    )
+    await session.commit()
+
+    response = await client.get("/api/categorisation/queue", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 2
+    # Woolworths has four decisions behind it, Gull two: the fuller one leads.
+    assert body[0]["category_name"] == "Groceries"
+    assert body[0]["evidence"] == 4
+    assert body[1]["category_name"] == "Transport"
+    # Whole rows come back, so the page renders without a second request.
+    assert body[0]["description"]
+    assert body[0]["account_name"] == "Everyday"
+    assert body[0]["currency"] == "NZD"
+    assert body[1]["transaction_id"] == str(recent.id)

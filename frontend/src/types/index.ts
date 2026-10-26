@@ -277,12 +277,23 @@ export interface CategorisationSuggestion {
   category_name: string
   /** Share of the supporting decisions that agree, 0..1. */
   confidence: number
-  /** How many earlier decisions the proposal rests on. */
+  /** How many earlier decisions the proposal rests on, and how many agree.
+   *  The pair reads as "2 of 3", which is more honest than a percentage. */
   evidence: number
+  agreed: number
   /** Whether the merchant entity or a description token carried it. */
   source: 'payee' | 'description'
   /** The payee name or token that matched. */
   matched: string
+}
+
+/** A queue entry: the suggestion plus the row it belongs to. */
+export interface CategorisationQueueItem extends CategorisationSuggestion {
+  description: string
+  date: string
+  amount: number
+  currency: string
+  account_name: string
 }
 
 export interface Transaction {

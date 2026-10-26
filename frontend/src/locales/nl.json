@@ -1152,11 +1152,12 @@
     "invoiceBadgeTooltip": "Deze transactie rekent een factuur af. Openen.",
     "suggestionBadge": "Vraag",
     "suggestionBadgeTooltip": "Een betaling kan deze factuur voldoen. Open de wachtrij om te antwoorden.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Voorgesteld op basis van {{count}} eerdere keuzes voor {{matched}}. Wordt pas toegepast als je accepteert.",
     "categorySuggestionAccept": "Voorgestelde categorie accepteren",
     "categorySuggestionDismiss": "Suggestie negeren",
-    "clearGroupFilter": "Groepsfilter wissen"
+    "clearGroupFilter": "Groepsfilter wissen",
+    "reviewCategories": "Categorieën controleren"
   },
   "accounts": {
     "title": "Rekeningen",
@@ -2990,5 +2991,12 @@
       "recurring": "Regels voor Terugkerend",
       "recurringHint": "Hoe we bepalen dat een afschrijving de rekening is die je al verwachtte."
     }
+  },
+  "categorisation": {
+    "title": "Categorieën controleren",
+    "subtitle": "Rijen die je geschiedenis kan indelen. Er verandert niets tot je accepteert.",
+    "empty": "Op dit moment niets te controleren.",
+    "acceptAll": "Alle {{count}} accepteren",
+    "accepted": "{{count}} gecategoriseerd"
   }
 }

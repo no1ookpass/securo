@@ -1193,11 +1193,12 @@
     "invoiceBadgeTooltip": "Ta transakcja rozlicza fakturę. Otwórz ją.",
     "suggestionBadge": "Pytanie",
     "suggestionBadgeTooltip": "Płatność może opłacić tę fakturę. Otwórz kolejkę, aby odpowiedzieć.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Sugestia na podstawie {{count}} wcześniejszych decyzji dla {{matched}}. Nie zostanie zastosowana bez akceptacji.",
     "categorySuggestionAccept": "Zaakceptuj sugerowaną kategorię",
     "categorySuggestionDismiss": "Odrzuć sugestię",
-    "clearGroupFilter": "Wyczyść filtr grupy"
+    "clearGroupFilter": "Wyczyść filtr grupy",
+    "reviewCategories": "Sprawdź kategorie"
   },
   "accounts": {
     "title": "Konta",
@@ -3100,5 +3101,12 @@
       "recurring": "Reguły Cyklicznych",
       "recurringHint": "Jak ustalamy, że obciążenie to rachunek, którego już oczekiwałeś."
     }
+  },
+  "categorisation": {
+    "title": "Sprawdź kategorie",
+    "subtitle": "Wiersze, które Twoja historia może zaklasyfikować. Nic się nie zmieni, dopóki nie zaakceptujesz.",
+    "empty": "Na razie nie ma nic do sprawdzenia.",
+    "acceptAll": "Zaakceptuj wszystkie ({{count}})",
+    "accepted": "Zaklasyfikowano {{count}}"
   }
 }

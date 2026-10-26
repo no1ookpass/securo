@@ -1154,11 +1154,12 @@
     "invoiceBadgeTooltip": "Cette transaction solde une facture. Ouvrir.",
     "suggestionBadge": "Question",
     "suggestionBadgeTooltip": "Un paiement peut solder cette facture. Ouvrez la file pour répondre.",
-    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestion": "{{category}} · {{agreed}}/{{evidence}}",
     "categorySuggestionTooltip": "Suggéré à partir de {{count}} décisions précédentes pour {{matched}}. Appliqué seulement après votre acceptation.",
     "categorySuggestionAccept": "Accepter la catégorie suggérée",
     "categorySuggestionDismiss": "Ignorer la suggestion",
-    "clearGroupFilter": "Effacer le filtre de groupe"
+    "clearGroupFilter": "Effacer le filtre de groupe",
+    "reviewCategories": "Vérifier les catégories"
   },
   "accounts": {
     "title": "Comptes",
@@ -2992,5 +2993,12 @@
       "recurring": "Règles Récurrentes",
       "recurringHint": "Comment nous décidons qu’un prélèvement est la facture que vous attendiez."
     }
+  },
+  "categorisation": {
+    "title": "Vérifier les catégories",
+    "subtitle": "Des lignes que votre historique peut classer. Rien ne change tant que vous n'acceptez pas.",
+    "empty": "Rien à vérifier pour le moment.",
+    "acceptAll": "Accepter les {{count}}",
+    "accepted": "{{count}} catégorisées"
   }
 }
