@@ -190,6 +190,36 @@ docker compose exec db psql -U postgres -d securo -tAc "select version_num from 
 docker compose exec backend alembic heads
 ```
 
+### Re-fetching one account's history
+
+The sync window is anchored on `bank_connections.last_sync_at`, which one
+connection shares across all of its accounts, so a SQL-only datafix cannot name
+a single account. The repair that works on the shipped code is to clear the
+account's rows and let the sync see an account with no history, which makes it
+ask for everything:
+
+```sql
+-- snapshot first; the provider will return the same rows again
+create table _backfill_backup as
+select t.* from transactions t
+join accounts a on a.id = t.account_id
+join institutions i on i.id = a.institution_id
+where i.name = 'Kiwibank';
+
+delete from transactions t
+using accounts a, institutions i
+where t.account_id = a.id and a.institution_id = i.id and i.name = 'Kiwibank';
+```
+
+Then trigger a sync of that connection (`docker compose exec celery-worker python -c
+"from app.tasks.sync_tasks import sync_single_connection;
+sync_single_connection.delay('<connection_id>', '<user_id>')"`). Other accounts
+keep the incremental window, so only the cleared one is re-read in full. The
+synthetic `opening_balance` rows are recomputed on that same pass.
+
+Do this only for accounts with no user state on the rows (no category, notes,
+tags, ignored flag or transfer link), because deleting them discards it.
+
 ## 9. Verify
 
 ```bash
