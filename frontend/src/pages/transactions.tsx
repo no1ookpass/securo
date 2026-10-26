@@ -1032,6 +1032,7 @@ export default function TransactionsPage() {
           type: filterType || undefined,
           status: filterStatus || undefined,
           uncategorized: filterUncategorized ? true : undefined,
+          has_suggestion: filterHasSuggestion ? true : undefined,
           from: filterFrom || undefined,
           to: filterTo || undefined,
           q: searchQuery || undefined,

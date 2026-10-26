@@ -488,3 +488,65 @@ async def test_the_list_filter_is_empty_when_nothing_can_be_filed(
     assert response.json() == {
         "items": [], "total": 0, "page": 1, "limit": 50, "summary": None,
     }
+
+    # The export has the same filter, and with nothing to file it must produce
+    # an empty file rather than quietly handing back every transaction under the
+    # name of a filtered export.
+    export = await client.get(
+        "/api/transactions/export",
+        params={"has_suggestion": "true"},
+        headers=auth_headers,
+    )
+    assert export.status_code == 200
+    rows = [line for line in export.text.strip().splitlines() if line]
+    assert len(rows) == 1  # the header row only
+    assert "SOMETHING UNSEEN" not in export.text
+
+
+async def test_the_csv_export_honours_the_suggestion_filter(
+    session: AsyncSession, client: AsyncClient, auth_headers: dict,
+    test_user, test_workspace,
+):
+    """A filtered table must not export more rows than it is showing."""
+    account = await _account(session, test_workspace.id, test_user.id)
+    groceries = await _category(session, test_workspace.id, test_user.id, "Groceries")
+    woolworths = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Woolworths", source="sync",
+    )
+    stranger = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Somewhere New", source="sync",
+    )
+    session.add_all([woolworths, stranger])
+    await session.flush()
+
+    for i in range(2):
+        await _transaction(
+            session, account=account, user_id=test_user.id,
+            workspace_id=test_workspace.id, payee=woolworths,
+            description=f"WOOLWORTHS NZ/STORE {i}", category=groceries,
+            when=BASE + timedelta(days=i),
+        )
+    await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=woolworths,
+        description="WOOLWORTHS NZ/BULK", category=None, when=BASE + timedelta(days=5),
+    )
+    await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=stranger,
+        description="SOMETHING UNSEEN 4471", category=None, when=BASE + timedelta(days=6),
+    )
+    await session.commit()
+
+    export = await client.get(
+        "/api/transactions/export",
+        params={"has_suggestion": "true"},
+        headers=auth_headers,
+    )
+    assert export.status_code == 200
+    rows = [line for line in export.text.strip().splitlines() if line]
+    assert len(rows) == 2  # header + the one suggested row
+    assert "WOOLWORTHS NZ/BULK" in export.text
+    assert "SOMETHING UNSEEN" not in export.text

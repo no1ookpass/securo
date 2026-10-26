@@ -774,6 +774,7 @@ export const transactions = {
     category_ids?: string[]
     payee_id?: string
     uncategorized?: boolean
+    has_suggestion?: boolean
     type?: string
     status?: string
     from?: string

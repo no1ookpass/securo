@@ -238,6 +238,7 @@ async def export_transactions(
     to_date: Optional[date] = Query(None, alias="to"),
     q: Optional[str] = Query(None),
     uncategorized: bool = Query(False),
+    has_suggestion: bool = Query(False, description="Same filter as the list; a filtered table should export the rows it is showing."),
     type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     exclude_ignored: bool = Query(False, description="Drop rows the user marked ignored, or whose category is ignored"),
@@ -257,16 +258,28 @@ async def export_transactions(
             transaction_ids=transaction_ids,
         )
     else:
-        transactions, _, _ = await transaction_service.get_transactions(
-            session, ctx.workspace.id, ctx.user_id,
-            account_ids=_merge_id_filters(account_id, account_ids),
-            category_ids=_merge_id_filters(category_id, category_ids),
-            payee_id=payee_id, from_date=from_date, to_date=to_date,
-            search=q, uncategorized=uncategorized, txn_type=type, status=status, skip_pagination=True,
-            accounting_mode=accounting_mode,
-            exclude_ignored=exclude_ignored,
-            tags=tags,
-        )
+        suggested_ids: Optional[list[uuid.UUID]] = None
+        if has_suggestion:
+            suggested_ids = sorted(
+                await categorisation_memory.suggestion_ids(session, ctx.workspace.id)
+            )
+        if suggested_ids is None or suggested_ids:
+            transactions, _, _ = await transaction_service.get_transactions(
+                session, ctx.workspace.id, ctx.user_id,
+                account_ids=_merge_id_filters(account_id, account_ids),
+                category_ids=_merge_id_filters(category_id, category_ids),
+                payee_id=payee_id, from_date=from_date, to_date=to_date,
+                search=q, uncategorized=uncategorized, txn_type=type, status=status, skip_pagination=True,
+                accounting_mode=accounting_mode,
+                exclude_ignored=exclude_ignored,
+                tags=tags,
+                transaction_ids=suggested_ids,
+            )
+        else:
+            # The memory can file nothing here. Export an empty file rather than
+            # falling through to "no filter", which would hand back every row
+            # in the workspace under the name of a filtered export.
+            transactions = []
 
     output = io.StringIO()
     output.write("﻿")  # UTF-8 BOM for Excel
