@@ -122,6 +122,10 @@ EOF
 sudo systemctl enable --now caddy
 ```
 
+> The `3000` above is the published frontend port, not a fixed number: on this
+> server it is `3010` (3000 belongs to `netbootxyz`) and the proxy is an nginx
+> container rather than Caddy. See §8 for the setup that is actually running.
+
 ## 7. Bring it up
 
 ```bash
@@ -137,7 +141,56 @@ Service ports: backend `:8000` (internal), frontend nginx `:3000` (Caddy
 upstream). The backend runs `alembic upgrade head` on boot; it's already at
 head so it's a no-op.
 
-## 8. Verify
+## 8. Updating the running deployment (what the server actually does)
+
+The server does **not** run `docker-compose.prod.yml`. It runs
+`docker-compose.yml` (the dev compose) from `/home/homeserveruser/docker/securo`:
+the backend bind-mounts `./backend` at `/app` and runs
+`alembic upgrade head && uvicorn --reload`, the frontend is the vite dev server,
+and the reverse proxy is an nginx container (`/etc/nginx/conf.d/money.conf`),
+not Caddy.
+
+Consequences that matter:
+
+- `FRONTEND_PORT=3010`, because host port 3000 is already taken by `netbootxyz`
+  on this machine. Whatever proxies `money.hmg.co.nz` must target 3010 (or
+  whichever `FRONTEND_PORT` says), never a hard-coded 3000.
+- `BACKEND_PORT=127.0.0.1:8000` keeps the API off the LAN.
+- `--reload` picks up changed Python files but **alembic only runs when the
+  container starts**. A `git pull` therefore ships new code against the old
+  schema unless the migration is run by hand.
+
+Updating:
+
+```bash
+cd /home/homeserveruser/docker/securo
+git fetch && git checkout feat/akahu-provider && git pull
+
+# 1. always, after a pull that touches migrations:
+docker compose exec db pg_dump -U postgres -d securo -Fc > pre-update-$(date +%F).dump
+docker compose exec backend alembic upgrade head
+
+# 2. celery has no --reload, so it keeps the old code until restarted:
+docker compose restart celery-worker celery-beat
+
+# 3. if package.json/package-lock.json changed (node_modules is a named volume):
+docker compose exec frontend npm ci
+```
+
+Skipping the alembic step is the failure mode seen on 2026-10-26: code at
+`098`, database at `084`, and every query touching a new column failed with
+
+    asyncpg.exceptions.UndefinedColumnError: column workspaces.timezone does not exist
+
+which the UI reports as empty pages and 500s. The rows were never lost; the
+schema was simply behind the code. Check the version explicitly:
+
+```bash
+docker compose exec db psql -U postgres -d securo -tAc "select version_num from alembic_version;"
+docker compose exec backend alembic heads
+```
+
+## 9. Verify
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" https://money.hmg.co.nz        # 200
