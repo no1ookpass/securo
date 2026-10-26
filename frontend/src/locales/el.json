@@ -1352,6 +1352,10 @@
     "invoiceBadgeTooltip": "Αυτή η συναλλαγή εξοφλεί ένα τιμολόγιο. Ανοίξτε το.",
     "suggestionBadge": "Ερώτηση",
     "suggestionBadgeTooltip": "Μια πληρωμή μπορεί να εξοφλεί ένα τιμολόγιο. Ανοίξτε την ουρά για να απαντήσετε.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Πρόταση από {{count}} προηγούμενες αποφάσεις για {{matched}}. Δεν εφαρμόζεται μέχρι να την αποδεχτείτε.",
+    "categorySuggestionAccept": "Αποδοχή προτεινόμενης κατηγορίας",
+    "categorySuggestionDismiss": "Απόρριψη πρότασης",
     "clearGroupFilter": "Κατάργηση φίλτρου ομάδας"
   },
   "budgets": {

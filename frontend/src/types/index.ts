@@ -267,6 +267,24 @@ export interface DescriptionSuggestion {
   payee_id: string | null
 }
 
+/** A category the workspace's own history would propose for one transaction.
+ *
+ *  A proposal, never a decision: accepting is an ordinary transaction update,
+ *  so nothing changes a category without a human. */
+export interface CategorisationSuggestion {
+  transaction_id: string
+  category_id: string
+  category_name: string
+  /** Share of the supporting decisions that agree, 0..1. */
+  confidence: number
+  /** How many earlier decisions the proposal rests on. */
+  evidence: number
+  /** Whether the merchant entity or a description token carried it. */
+  source: 'payee' | 'description'
+  /** The payee name or token that matched. */
+  matched: string
+}
+
 export interface Transaction {
   /** Every invoice this transaction settles — a payout net of fees
    *  settles several. Absent in a workspace without the module. */

@@ -1152,6 +1152,10 @@
     "invoiceBadgeTooltip": "यह लेन-देन एक इनवॉइस चुकाता है। इसे खोलें।",
     "suggestionBadge": "सवाल",
     "suggestionBadgeTooltip": "एक भुगतान इसे चुका सकता है। जवाब देने के लिए कतार खोलें।",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "{{matched}} के लिए {{count}} पिछले निर्णयों से सुझाव। स्वीकार करने तक लागू नहीं होगा।",
+    "categorySuggestionAccept": "सुझाई गई श्रेणी स्वीकार करें",
+    "categorySuggestionDismiss": "सुझाव खारिज करें",
     "clearGroupFilter": "समूह फ़िल्टर हटाएँ"
   },
   "accounts": {

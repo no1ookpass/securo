@@ -1152,6 +1152,10 @@
     "invoiceBadgeTooltip": "この取引は請求書を決済しています。開く。",
     "suggestionBadge": "要確認",
     "suggestionBadgeTooltip": "これが何かを消し込む可能性があります。キューを開いて回答してください。",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "{{matched}} に対する過去 {{count}} 件の判断からの提案です。承認するまで適用されません。",
+    "categorySuggestionAccept": "提案されたカテゴリを承認",
+    "categorySuggestionDismiss": "提案を却下",
     "clearGroupFilter": "グループフィルターを解除"
   },
   "accounts": {

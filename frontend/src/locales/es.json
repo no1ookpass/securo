@@ -1154,6 +1154,10 @@
     "invoiceBadgeTooltip": "Esta transacción salda una factura. Ábrela.",
     "suggestionBadge": "Pregunta",
     "suggestionBadgeTooltip": "Un pago puede saldar esta factura. Abre la cola para responder.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Sugerido a partir de {{count}} decisiones anteriores para {{matched}}. No se aplica hasta que lo aceptes.",
+    "categorySuggestionAccept": "Aceptar la categoría sugerida",
+    "categorySuggestionDismiss": "Descartar la sugerencia",
     "clearGroupFilter": "Quitar filtro de grupo"
   },
   "accounts": {

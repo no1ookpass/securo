@@ -1154,6 +1154,10 @@
     "invoiceBadgeTooltip": "Esta transação quita uma cobrança. Abrir.",
     "suggestionBadge": "Pergunta",
     "suggestionBadgeTooltip": "Um pagamento pode quitar esta cobrança. Abra a fila para responder.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Sugerido a partir de {{count}} decisões anteriores para {{matched}}. Não é aplicado até você aceitar.",
+    "categorySuggestionAccept": "Aceitar a categoria sugerida",
+    "categorySuggestionDismiss": "Dispensar a sugestão",
     "clearGroupFilter": "Limpar filtro de grupo"
   },
   "accounts": {

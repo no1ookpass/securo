@@ -1166,6 +1166,10 @@
     "invoiceBadgeTooltip": "Эта операция закрывает счёт. Открыть.",
     "suggestionBadge": "Вопрос",
     "suggestionBadgeTooltip": "Платёж может закрыть этот счёт. Откройте очередь, чтобы ответить.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Предложено на основе {{count}} предыдущих решений для {{matched}}. Не применяется до подтверждения.",
+    "categorySuggestionAccept": "Принять предложенную категорию",
+    "categorySuggestionDismiss": "Отклонить предложение",
     "clearGroupFilter": "Сбросить фильтр группы"
   },
   "accounts": {

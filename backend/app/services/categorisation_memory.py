@@ -222,6 +222,107 @@ class CategoryMemory:
         return best
 
 
+@dataclass(frozen=True)
+class GradedTransaction:
+    """One uncategorised transaction and what the memory would propose for it."""
+
+    transaction_id: uuid.UUID
+    category_id: uuid.UUID
+    category_name: str
+    confidence: float
+    evidence: int
+    source: Literal["payee", "description"]
+    matched: str
+
+
+async def grade_uncategorised(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    *,
+    transaction_ids: Optional[Iterable[uuid.UUID]] = None,
+    limit: int = 50,
+    min_evidence: int = MIN_EVIDENCE,
+    min_share: float = MIN_SHARE,
+) -> list[GradedTransaction]:
+    """Propose a category for uncategorised transactions in a workspace.
+
+    ``transaction_ids`` grades exactly those rows (the page in front of the
+    user); without it the workspace's newest uncategorised rows are graded, up
+    to ``limit``. Rows the memory is not sure about are simply absent from the
+    result - the caller shows a chip for what came back and nothing otherwise.
+    """
+    stmt = select(
+        Transaction.id,
+        Transaction.payee_id,
+        Transaction.description,
+        Transaction.payee,
+    ).where(
+        Transaction.workspace_id == workspace_id,
+        Transaction.category_id.is_(None),
+        Transaction.is_ignored.is_(False),
+        Transaction.source != "opening_balance",
+    )
+    if transaction_ids is not None:
+        ids = list(transaction_ids)
+        if not ids:
+            return []
+        stmt = stmt.where(Transaction.id.in_(ids))
+    else:
+        stmt = stmt.order_by(Transaction.date.desc(), Transaction.id).limit(limit)
+
+    candidates = (await session.execute(stmt)).all()
+    if not candidates:
+        return []
+
+    memory = await load_memory(session, workspace_id)
+
+    graded: list[GradedTransaction] = []
+    for row in candidates:
+        suggestion = memory.suggest(
+            payee_id=row.payee_id,
+            description=row.description,
+            payee_name=row.payee,
+            min_evidence=min_evidence,
+            min_share=min_share,
+        )
+        if suggestion is None:
+            continue
+        graded.append(
+            GradedTransaction(
+                transaction_id=row.id,
+                category_id=suggestion.category_id,
+                category_name="",
+                confidence=suggestion.confidence,
+                evidence=suggestion.evidence,
+                source=suggestion.source,
+                matched=suggestion.matched,
+            )
+        )
+    if not graded:
+        return []
+
+    names = {
+        row.id: row.name
+        for row in await session.execute(
+            select(Category.id, Category.name).where(
+                Category.id.in_({g.category_id for g in graded})
+            )
+        )
+    }
+    return [
+        GradedTransaction(
+            transaction_id=g.transaction_id,
+            category_id=g.category_id,
+            category_name=names.get(g.category_id, ""),
+            confidence=g.confidence,
+            evidence=g.evidence,
+            source=g.source,
+            matched=g.matched,
+        )
+        for g in graded
+    ]
+
+
 async def load_memory(
     session: AsyncSession,
     workspace_id: uuid.UUID,

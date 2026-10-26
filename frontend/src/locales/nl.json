@@ -1152,6 +1152,10 @@
     "invoiceBadgeTooltip": "Deze transactie rekent een factuur af. Openen.",
     "suggestionBadge": "Vraag",
     "suggestionBadgeTooltip": "Een betaling kan deze factuur voldoen. Open de wachtrij om te antwoorden.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Voorgesteld op basis van {{count}} eerdere keuzes voor {{matched}}. Wordt pas toegepast als je accepteert.",
+    "categorySuggestionAccept": "Voorgestelde categorie accepteren",
+    "categorySuggestionDismiss": "Suggestie negeren",
     "clearGroupFilter": "Groepsfilter wissen"
   },
   "accounts": {

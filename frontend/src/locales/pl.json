@@ -1193,6 +1193,10 @@
     "invoiceBadgeTooltip": "Ta transakcja rozlicza fakturę. Otwórz ją.",
     "suggestionBadge": "Pytanie",
     "suggestionBadgeTooltip": "Płatność może opłacić tę fakturę. Otwórz kolejkę, aby odpowiedzieć.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Sugestia na podstawie {{count}} wcześniejszych decyzji dla {{matched}}. Nie zostanie zastosowana bez akceptacji.",
+    "categorySuggestionAccept": "Zaakceptuj sugerowaną kategorię",
+    "categorySuggestionDismiss": "Odrzuć sugestię",
     "clearGroupFilter": "Wyczyść filtr grupy"
   },
   "accounts": {

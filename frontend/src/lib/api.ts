@@ -21,6 +21,7 @@ import type {
   AccountRunningBalancePoint,
   Collection,
   CreditCardBill,
+  CategorisationSuggestion,
   DescriptionSuggestion,
   Transaction,
   Payee,
@@ -340,6 +341,22 @@ export const auth = {
 }
 
 // Categories
+export const categorisation = {
+  /** Categories the workspace's own history would propose for uncategorised rows.
+   *
+   * Read-only. Rows the memory is unsure about are absent from the response, so
+   * a caller renders a chip for what comes back and nothing otherwise. Passing
+   * the rows on screen keeps the work proportional to a page, not the backlog.
+   */
+  suggestions: async (transactionIds?: string[], limit = 50): Promise<CategorisationSuggestion[]> => {
+    const { data } = await api.get('/categorisation/suggestions', {
+      params: { transaction_ids: transactionIds, limit },
+      paramsSerializer: { indexes: null },
+    })
+    return data
+  },
+}
+
 export const categories = {
   list: async (): Promise<Category[]> => {
     const { data } = await api.get('/categories')

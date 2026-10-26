@@ -8,7 +8,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useDisplayLocale, useDateLocale } from '@/hooks/use-display-locale'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { transactions, categories as categoriesApi, categoryGroups as categoryGroupsApi, accounts as accountsApi, recurring, payees as payeesApi, admin, groups as groupsApi, rules as rulesApi, reconciliation as reconciliationApi } from '@/lib/api'
+import { transactions, categories as categoriesApi, categoryGroups as categoryGroupsApi, accounts as accountsApi, recurring, payees as payeesApi, admin, groups as groupsApi, rules as rulesApi, reconciliation as reconciliationApi, categorisation } from '@/lib/api'
 import { invalidateFinancialQueries } from '@/lib/invalidate-queries'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -47,8 +47,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, ArrowLeftRight, ArrowUp, ArrowDown, Check, Clock, HelpCircle, Info, Paperclip, TagIcon, Trash2, Users, X, EyeClosed, ChartNoAxesColumn, SlidersHorizontal, Receipt } from 'lucide-react'
-import type { Transaction, Rule, InstallmentSeriesInput, TransactionApplyScope, TransactionEditPayload, ReconciliationSuggestion } from '@/types'
+import { AlertTriangle, ArrowLeftRight, ArrowUp, ArrowDown, Check, Clock, HelpCircle, Info, Paperclip, TagIcon, Trash2, Users, X, EyeClosed, ChartNoAxesColumn, SlidersHorizontal, Receipt, Sparkles } from 'lucide-react'
+import type { Transaction, Rule, InstallmentSeriesInput, TransactionApplyScope, TransactionEditPayload, ReconciliationSuggestion, CategorisationSuggestion } from '@/types'
 import { RuleDialog, type RuleDialogInitialData } from '@/components/rule-dialog'
 import { PageHeader } from '@/components/page-header'
 import { calculateRangeSelection } from '@/lib/selection-utils'
@@ -426,6 +426,33 @@ export default function TransactionsPage() {
         ...(isMobile ? { sort_by: 'date', sort_dir: 'desc' as const } : grid.apiSort),
       }),
   })
+
+  // Learned category suggestions for the uncategorised rows on this page.
+  //
+  // Read-only by construction: accepting one calls the ordinary transaction
+  // update, so the memory can never change a category on its own. Only the ids
+  // on screen are sent, which keeps the work proportional to a page rather than
+  // to the whole backlog, and rows the memory is unsure about are simply absent
+  // from the response.
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set())
+  const uncategorisedIds = useMemo(
+    () =>
+      (data?.items ?? [])
+        .filter((tx) => !tx.category_id)
+        .map((tx) => tx.id)
+        .slice(0, 100),
+    [data?.items],
+  )
+  const { data: categorySuggestions } = useQuery({
+    queryKey: ['categorisation-suggestions', uncategorisedIds.join(',')],
+    enabled: uncategorisedIds.length > 0,
+    staleTime: 60_000,
+    queryFn: () => categorisation.suggestions(uncategorisedIds),
+  })
+  const categorySuggestionById = useMemo(
+    () => new Map((categorySuggestions ?? []).map((s) => [s.transaction_id, s])),
+    [categorySuggestions],
+  )
 
   const calendarMonth = steppedMonth
   const calendarAccountIds = filterAccountIds.length === 1 ? filterAccountIds : []
@@ -1107,6 +1134,15 @@ export default function TransactionsPage() {
     )
   }
 
+  /** Accept a proposed category: the ordinary update, nothing special. */
+  const acceptCategorySuggestion = (tx: Transaction, suggestion: CategorisationSuggestion) => {
+    updateMutation.mutate({ id: tx.id, category_id: suggestion.category_id })
+  }
+
+  const dismissCategorySuggestion = (transactionId: string) => {
+    setDismissedSuggestions((prev) => new Set(prev).add(transactionId))
+  }
+
   const renderDescriptionCell = (tx: Transaction) => {
     const showInlineDate = !grid.isVisible('date')
     const showInlineNotes = !grid.isVisible('notes')
@@ -1157,6 +1193,47 @@ export default function TransactionsPage() {
                 {t('transactions.suggestionBadge')}
               </Link>
             )}
+            {/* What this workspace's own history would file this row under. A
+                proposal, not a decision: the tick writes, the cross hides it for
+                this session, and doing nothing leaves the row uncategorised. */}
+            {(() => {
+              const suggestion = categorySuggestionById.get(tx.id)
+              if (!suggestion || dismissedSuggestions.has(tx.id)) return null
+              return (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900 px-1.5 py-0.5 rounded-full"
+                  title={t('transactions.categorySuggestionTooltip', {
+                    category: suggestion.category_name,
+                    count: suggestion.evidence,
+                    matched: suggestion.matched,
+                  })}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {t('transactions.categorySuggestion', {
+                    category: suggestion.category_name,
+                    confidence: Math.round(suggestion.confidence * 100),
+                  })}
+                  <button
+                    type="button"
+                    title={t('transactions.categorySuggestionAccept')}
+                    aria-label={t('transactions.categorySuggestionAccept')}
+                    onClick={(e) => { e.stopPropagation(); acceptCategorySuggestion(tx, suggestion) }}
+                    className="hover:text-emerald-900 dark:hover:text-emerald-100"
+                  >
+                    <Check className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    title={t('transactions.categorySuggestionDismiss')}
+                    aria-label={t('transactions.categorySuggestionDismiss')}
+                    onClick={(e) => { e.stopPropagation(); dismissCategorySuggestion(tx.id) }}
+                    className="hover:text-emerald-900 dark:hover:text-emerald-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )
+            })()}
             {(tx.invoice_links ?? []).map((link) => (
               <Link
                 key={link.invoice_id}

@@ -1152,6 +1152,10 @@
     "invoiceBadgeTooltip": "Ez a tranzakció egy számlát egyenlít ki. Megnyitás.",
     "suggestionBadge": "Kérdés",
     "suggestionBadgeTooltip": "Lehet, hogy egy befizetés kiegyenlíti ezt. Nyisd meg a sort a válaszhoz.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "{{count}} korábbi döntés alapján javasolt ehhez: {{matched}}. Csak elfogadás után kerül alkalmazásra.",
+    "categorySuggestionAccept": "Javasolt kategória elfogadása",
+    "categorySuggestionDismiss": "Javaslat elvetése",
     "clearGroupFilter": "Csoportszűrő törlése"
   },
   "accounts": {

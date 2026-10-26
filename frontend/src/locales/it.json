@@ -1154,6 +1154,10 @@
     "invoiceBadgeTooltip": "Questa transazione salda una fattura. Aprila.",
     "suggestionBadge": "Domanda",
     "suggestionBadgeTooltip": "Un pagamento potrebbe saldare questa fattura. Apri la coda per rispondere.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Suggerito da {{count}} decisioni precedenti per {{matched}}. Non viene applicato finché non lo accetti.",
+    "categorySuggestionAccept": "Accetta la categoria suggerita",
+    "categorySuggestionDismiss": "Ignora il suggerimento",
     "clearGroupFilter": "Rimuovi filtro gruppo"
   },
   "accounts": {

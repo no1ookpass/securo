@@ -1154,6 +1154,10 @@
     "invoiceBadgeTooltip": "Cette transaction solde une facture. Ouvrir.",
     "suggestionBadge": "Question",
     "suggestionBadgeTooltip": "Un paiement peut solder cette facture. Ouvrez la file pour répondre.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Suggéré à partir de {{count}} décisions précédentes pour {{matched}}. Appliqué seulement après votre acceptation.",
+    "categorySuggestionAccept": "Accepter la catégorie suggérée",
+    "categorySuggestionDismiss": "Ignorer la suggestion",
     "clearGroupFilter": "Effacer le filtre de groupe"
   },
   "accounts": {

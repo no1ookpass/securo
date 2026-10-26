@@ -1204,6 +1204,10 @@
     "invoiceBadgeTooltip": "Táto transakcia vyrovnáva faktúru. Otvorte ju.",
     "suggestionBadge": "Otázka",
     "suggestionBadgeTooltip": "Platba môže uhradiť túto faktúru. Otvorte front a odpovedzte.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Návrh z {{count}} predchádzajúcich rozhodnutí pre {{matched}}. Nepoužije sa, kým ho neschválite.",
+    "categorySuggestionAccept": "Prijať navrhnutú kategóriu",
+    "categorySuggestionDismiss": "Zamietnuť návrh",
     "clearGroupFilter": "Zrušiť filter skupiny"
   },
   "accounts": {

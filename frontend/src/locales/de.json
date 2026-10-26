@@ -1152,6 +1152,10 @@
     "invoiceBadgeTooltip": "Diese Transaktion begleicht eine Rechnung. Öffnen.",
     "suggestionBadge": "Frage",
     "suggestionBadgeTooltip": "Eine Zahlung könnte diese Rechnung begleichen. Öffnen Sie die Warteschlange.",
+    "categorySuggestion": "{{category}} · {{confidence}}%",
+    "categorySuggestionTooltip": "Vorschlag aus {{count}} früheren Entscheidungen für {{matched}}. Wird erst nach Bestätigung angewendet.",
+    "categorySuggestionAccept": "Vorgeschlagene Kategorie übernehmen",
+    "categorySuggestionDismiss": "Vorschlag verwerfen",
     "clearGroupFilter": "Gruppenfilter entfernen"
   },
   "accounts": {
