@@ -38,6 +38,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.reconciliation import ReconciliationSuggestion
+from app.models.transaction import Transaction
 from app.services import reconciliation_history_service
 from app.services.reconciliation_engine import Decision, Movement, Settlement
 
@@ -376,10 +377,63 @@ def _by_question(
     return list(groups.values())
 
 
+async def _unanswerable(
+    session: AsyncSession, workspace_id: uuid.UUID
+) -> list[ReconciliationSuggestion]:
+    """Questions about rows that are gone, or that somebody has already linked.
+
+    A transfer question names two transactions. Either can disappear under it -
+    a re-sync that re-keys a row, the phantom-duplicate cleanup removing a
+    reported twin, or a person deleting the row - and the pair itself can be
+    linked by something other than this queue. None of that is visible from the
+    suggestion row, which has no foreign key to follow.
+
+    Left pending, such a question is offered forever and every accept fails with
+    "One of the transactions is no longer there". On 2026-10-27 eleven of the
+    twenty-nine open questions in the live workspace were in exactly that state,
+    and the queue stops being worth reading once clicking it is a coin toss.
+    """
+    pending = (
+        await session.execute(
+            select(ReconciliationSuggestion).where(
+                ReconciliationSuggestion.workspace_id == workspace_id,
+                ReconciliationSuggestion.status == "pending",
+                ReconciliationSuggestion.expectation_kind == "transaction",
+            )
+        )
+    ).unique().scalars().all()
+    if not pending:
+        return []
+
+    ids = {row.transaction_id for row in pending} | {
+        row.expectation_id for row in pending
+    }
+    state = {
+        tx_id: transfer_pair_id
+        for tx_id, transfer_pair_id in await session.execute(
+            select(Transaction.id, Transaction.transfer_pair_id).where(
+                Transaction.id.in_(ids)
+            )
+        )
+    }
+
+    out: list[ReconciliationSuggestion] = []
+    for row in pending:
+        moved_gone = row.transaction_id not in state
+        other_gone = row.expectation_id not in state
+        already_paired = (
+            state.get(row.transaction_id) is not None
+            or state.get(row.expectation_id) is not None
+        )
+        if moved_gone or other_gone or already_paired:
+            out.append(row)
+    return out
+
+
 async def expire_stale(
     session: AsyncSession, workspace_id: uuid.UUID, *, now: Optional[datetime] = None
 ) -> int:
-    """Retire questions nobody answered.
+    """Retire questions nobody answered, and questions nobody *can* answer.
 
     Expired rather than deleted: the pair stays remembered, so a stale
     question is not re-asked the moment it is forgotten. That would be the
@@ -394,6 +448,16 @@ async def expire_stale(
         )
     )
     stale = list(result.unique().scalars().all())
+
+    # Age is only one way a question stops being answerable, and it is the slow
+    # one: sixty days of a queue offering something that can never be accepted.
+    # The other way is immediate, so it is checked here rather than by a job -
+    # this read is the only place the queue is ever looked at.
+    seen = {row.id for row in stale}
+    stale.extend(
+        row for row in await _unanswerable(session, workspace_id) if row.id not in seen
+    )
+
     for suggestion in stale:
         # Nobody answered, so nobody is recorded as having.
         _resolve(suggestion, "expired", None)
