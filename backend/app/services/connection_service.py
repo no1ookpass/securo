@@ -2246,9 +2246,27 @@ async def sync_connection(
             # cases: (1) PENDING transactions that POSTED since last sync,
             # (2) any rows Pluggy ingested late but backdated. Dedup on
             # external_id below handles overlap cheaply.
+            #
+            # It is only meaningful for an account this connection has already
+            # synced. An account the user added at the bank afterwards has no
+            # rows yet, and `last_sync_at` describes the connection, not that
+            # account. Asking for the last 14 days of it discards its history
+            # outright: Akahu maps `since` onto the transaction-date `start`
+            # parameter (akahu.py), unlike Pluggy's ingestion-time filter, so a
+            # newly added account would only ever show transactions newer than
+            # the previous sync. Ask for everything it has instead; an account
+            # that is genuinely empty costs one request per sync and starts
+            # backfilling the moment it has any history.
+            has_history = (
+                await session.scalar(
+                    select(Transaction.id)
+                    .where(Transaction.account_id == account.id)
+                    .limit(1)
+                )
+            ) is not None
             since = (
                 connection.last_sync_at.date() - timedelta(days=14)
-                if connection.last_sync_at
+                if connection.last_sync_at and has_history
                 else None
             )
             transactions_data = await provider.get_transactions(
