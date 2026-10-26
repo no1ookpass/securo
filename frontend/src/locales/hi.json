@@ -977,6 +977,8 @@
     "sortDesc": "घटते क्रम में लगाएँ",
     "syncedInfo": "बैंक-सिंक किया गया लेन-देन: राशि, तिथि और खाता संपादित नहीं किए जा सकते",
     "uncategorized": "अवर्गीकृत",
+    "hasSuggestion": "सुझाव है",
+    "hasSuggestionOnly": "सुझाव के साथ",
     "selected": "चयनित",
     "summaryCount": "{{count}} लेन-देन",
     "summaryIncome": "आय",
@@ -1156,8 +1158,7 @@
     "categorySuggestionTooltip": "{{matched}} के लिए {{count}} पिछले निर्णयों से सुझाव। स्वीकार करने तक लागू नहीं होगा।",
     "categorySuggestionAccept": "सुझाई गई श्रेणी स्वीकार करें",
     "categorySuggestionDismiss": "सुझाव खारिज करें",
-    "clearGroupFilter": "समूह फ़िल्टर हटाएँ",
-    "reviewCategories": "श्रेणियाँ जाँचें"
+    "clearGroupFilter": "समूह फ़िल्टर हटाएँ"
   },
   "accounts": {
     "title": "खाते",
@@ -2989,12 +2990,5 @@
       "recurring": "आवर्ती नियम",
       "recurringHint": "हम कैसे तय करते हैं कि कोई शुल्क वही बिल है जिसकी आप पहले से अपेक्षा कर रहे थे।"
     }
-  },
-  "categorisation": {
-    "title": "श्रेणियाँ जाँचें",
-    "subtitle": "वे पंक्तियाँ जिन्हें आपका इतिहास वर्गीकृत कर सकता है। स्वीकार करने तक कुछ नहीं बदलेगा।",
-    "empty": "अभी जाँचने के लिए कुछ नहीं है।",
-    "acceptAll": "सभी {{count}} स्वीकार करें",
-    "accepted": "{{count}} वर्गीकृत किए गए"
   }
 }

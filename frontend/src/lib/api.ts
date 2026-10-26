@@ -21,7 +21,6 @@ import type {
   AccountRunningBalancePoint,
   Collection,
   CreditCardBill,
-  CategorisationQueueItem,
   CategorisationSuggestion,
   DescriptionSuggestion,
   Transaction,
@@ -356,12 +355,6 @@ export const categorisation = {
     })
     return data
   },
-  /** Every uncategorised row the memory can propose something for, best
-   *  supported first, with the row itself so the queue renders in one request. */
-  queue: async (limit = 200): Promise<CategorisationQueueItem[]> => {
-    const { data } = await api.get('/categorisation/queue', { params: { limit } })
-    return data
-  },
 }
 
 export const categories = {
@@ -570,6 +563,9 @@ export const transactions = {
     category_ids?: string[]
     payee_id?: string
     uncategorized?: boolean
+    /** Only rows the workspace's own history can categorise (learned
+     *  suggestions). Resolved server-side over the whole backlog. */
+    has_suggestion?: boolean
     type?: string
     status?: string
     from?: string

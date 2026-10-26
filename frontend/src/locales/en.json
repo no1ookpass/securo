@@ -977,6 +977,8 @@
     "sortDesc": "Sort descending",
     "syncedInfo": "Bank-synced transaction: amount, date and account can't be edited",
     "uncategorized": "Uncategorized",
+    "hasSuggestion": "Has suggestion",
+    "hasSuggestionOnly": "With suggestion",
     "selected": "selected",
     "summaryCount": "{{count}} transactions",
     "summaryIncome": "Income",
@@ -1156,8 +1158,7 @@
     "categorySuggestionTooltip": "Suggested from {{count}} earlier decisions for {{matched}}. Not applied until you accept.",
     "categorySuggestionAccept": "Accept suggested category",
     "categorySuggestionDismiss": "Dismiss suggestion",
-    "clearGroupFilter": "Clear group filter",
-    "reviewCategories": "Review categories"
+    "clearGroupFilter": "Clear group filter"
   },
   "accounts": {
     "title": "Accounts",
@@ -2989,12 +2990,5 @@
       "recurring": "Recurring rules",
       "recurringHint": "How we decide that a charge is the bill you were already expecting."
     }
-  },
-  "categorisation": {
-    "title": "Review categories",
-    "subtitle": "Rows your own history can file. Nothing changes until you accept.",
-    "empty": "Nothing to review right now.",
-    "acceptAll": "Accept all {{count}}",
-    "accepted": "{{count}} categorised"
   }
 }

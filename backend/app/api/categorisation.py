@@ -14,10 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_session
 from app.core.workspace_context import WorkspaceContext, current_workspace
-from app.schemas.categorisation import (
-    CategorisationQueueItemRead,
-    CategorisationSuggestionRead,
-)
+from app.schemas.categorisation import CategorisationSuggestionRead
 from app.services import categorisation_memory
 
 router = APIRouter(prefix="/api/categorisation", tags=["categorisation"])
@@ -61,39 +58,4 @@ async def list_suggestions(
             matched=item.matched,
         )
         for item in graded
-    ]
-
-
-@router.get("/queue", response_model=list[CategorisationQueueItemRead])
-async def review_queue(
-    limit: int = Query(200, ge=1, le=1000),
-    ctx: WorkspaceContext = Depends(current_workspace),
-    session: AsyncSession = Depends(get_async_session),
-) -> list[CategorisationQueueItemRead]:
-    """Every uncategorised row the memory can propose something for.
-
-    Ordered by how much history backs the proposal, so a person clears a
-    backlog one merchant at a time instead of scrolling the ledger hoping to
-    meet a suggestion. Read-only, exactly like the single-row route.
-    """
-    items = await categorisation_memory.grade_queue(
-        session, ctx.workspace.id, limit=limit
-    )
-    return [
-        CategorisationQueueItemRead(
-            transaction_id=item.transaction_id,
-            category_id=item.category_id,
-            category_name=item.category_name,
-            confidence=item.confidence,
-            evidence=item.evidence,
-            agreed=item.agreed,
-            source=item.source,
-            matched=item.matched,
-            description=item.description,
-            date=item.date,
-            amount=item.amount,
-            currency=item.currency,
-            account_name=item.account_name,
-        )
-        for item in items
     ]

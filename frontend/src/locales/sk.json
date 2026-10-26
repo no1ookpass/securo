@@ -997,6 +997,8 @@
     "sortDesc": "Zoradiť zostupne",
     "syncedInfo": "Transakcia synchronizovaná z banky: sumu, dátum a účet nemožno upraviť",
     "uncategorized": "Bez kategórie",
+    "hasSuggestion": "Má návrh",
+    "hasSuggestionOnly": "S návrhom",
     "selected": "vybraných",
     "summaryCount": "{{count}} transakcií",
     "summaryCount_one": "{{count}} transakcia",
@@ -1208,8 +1210,7 @@
     "categorySuggestionTooltip": "Návrh z {{count}} predchádzajúcich rozhodnutí pre {{matched}}. Nepoužije sa, kým ho neschválite.",
     "categorySuggestionAccept": "Prijať navrhnutú kategóriu",
     "categorySuggestionDismiss": "Zamietnuť návrh",
-    "clearGroupFilter": "Zrušiť filter skupiny",
-    "reviewCategories": "Skontrolovať kategórie"
+    "clearGroupFilter": "Zrušiť filter skupiny"
   },
   "accounts": {
     "title": "Účty",
@@ -3135,12 +3136,5 @@
       "recurring": "Pravidlá opakovaných",
       "recurringHint": "Ako určujeme, že odpis je účet, ktorý ste už očakávali."
     }
-  },
-  "categorisation": {
-    "title": "Skontrolovať kategórie",
-    "subtitle": "Riadky, ktoré môže vaša história zaradiť. Nič sa nezmení, kým neschválite.",
-    "empty": "Momentálne nie je čo kontrolovať.",
-    "acceptAll": "Prijať všetkých {{count}}",
-    "accepted": "{{count}} zaradených"
   }
 }

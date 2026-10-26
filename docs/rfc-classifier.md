@@ -162,13 +162,22 @@ This is the natural answer to the coverage gap: merchants with one or two decisi
 
 ### UI
 
-- **Review queue (implemented)** at `/transactions/review-categories`, reached from the
-  transactions page. Every uncategorised row the memory can file, best-supported first,
-  with the evidence and an accept-all per merchant - clearing nine Rothbury rows is one
-  decision, not nine. Without it, suggestions existed only on whichever page happened to
-  contain the row, which is useless for a 743-row backlog.
+- **A "Has suggestion" filter on the transactions list (implemented)**, not a separate
+  review page. A dedicated queue was built first and removed: it meant learning a second
+  screen and giving up the table's columns, sorting and bulk actions, when the real job
+  was choosing each category by hand. The filter narrows the list you already use.
+  It is resolved server-side over the whole backlog (`GET /api/transactions?has_suggestion=1`)
+  rather than over the page on screen: a filter that only filtered what had already
+  arrived would report "nothing left to review" while hundreds of rows remained, and it
+  would not paginate. Turning it on also clears the date range, because the page opens on
+  a month and a backlog is not a month - the same trap that once made a Rothbury
+  instalment permanently invisible.
 - A suggestion chip on the transaction row: proposed category, confidence, and the
   evidence ("12 similar, 11 agreed"), with accept and dismiss.
+- Suggestions survive a refetch. The chip query is keyed on the ids currently on screen,
+  so accepting one changes the key; keeping the previous answer means the page settles
+  instead of every chip blinking out and back. The accepted chip is hidden immediately,
+  and the row itself updates when the update lands.
 - A "learned merchants" list — merchant, category, vote counts — that can be corrected
   in one click. This is the audit surface, and it replaces per-merchant rules.
 - The import preview shows suggestions as an unselected hint, never a default.

@@ -13,6 +13,7 @@ import {
   ListChecks,
   ListFilter,
   Search,
+  Sparkles,
   Store,
   Tag,
   Users,
@@ -72,6 +73,9 @@ interface TransactionsFilterBarProps {
   onStatusChange: (value: string) => void
   hideIgnored: boolean
   onHideIgnoredChange: (value: boolean) => void
+  /** Only rows this workspace's history can categorise. */
+  filterHasSuggestion: boolean
+  onHasSuggestionChange: (value: boolean) => void
   filterFrom: string
   filterTo: string
   onDateRangeChange: (from: string, to: string) => void
@@ -115,6 +119,8 @@ export function TransactionsFilterBar({
   onStatusChange,
   hideIgnored,
   onHideIgnoredChange,
+  filterHasSuggestion,
+  onHasSuggestionChange,
   filterFrom,
   filterTo,
   onDateRangeChange,
@@ -205,6 +211,7 @@ export function TransactionsFilterBar({
     filterAccountIds.length > 0 ||
     filterCategoryIds.length > 0 ||
     filterUncategorized ||
+    filterHasSuggestion ||
     !!filterPayee ||
     !!filterGroupId ||
     !!filterType ||
@@ -435,6 +442,7 @@ export function TransactionsFilterBar({
                   type: typeLabel,
                   status: statusLabel,
                   ignored: hideIgnored ? t('transactions.ignoredHide') : undefined,
+                  suggestion: filterHasSuggestion ? t('transactions.hasSuggestionOnly') : undefined,
                   date: dateLabel,
                   amount: amountLabel,
                 }}
@@ -450,6 +458,8 @@ export function TransactionsFilterBar({
                 onStatusChange={onStatusChange}
                 hideIgnored={hideIgnored}
                 onHideIgnoredChange={onHideIgnoredChange}
+                hasSuggestion={filterHasSuggestion}
+                onHasSuggestionChange={onHasSuggestionChange}
                 onDateRangeChange={onDateRangeChange}
                 onAmountRangeChange={onAmountRangeChange}
                 onApplyAmountRange={applyAmountRange}
@@ -822,6 +832,21 @@ export function TransactionsFilterBar({
                   {hideIgnored && <Check size={13} className="text-primary" />}
                 </DropdownMenuItem>
 
+                {/* Suggestions are a reading filter rather than a value, like
+                    the ignored switch above: on shows only rows this
+                    workspace's history could file. */}
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault()
+                    onHasSuggestionChange(!filterHasSuggestion)
+                  }}
+                  className="gap-2 text-[13px]"
+                >
+                  <Sparkles size={14} className="text-muted-foreground" />
+                  <span className="flex-1">{t('transactions.hasSuggestion')}</span>
+                  {filterHasSuggestion && <Check size={13} className="text-primary" />}
+                </DropdownMenuItem>
+
                 {/* Date range submenu with presets */}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="gap-2 text-[13px]">
@@ -1014,6 +1039,7 @@ export function TransactionsFilterBar({
         {(filterAccountIds.length > 0 ||
           filterCategoryIds.length > 0 ||
           filterUncategorized ||
+          filterHasSuggestion ||
           !!selectedPayee ||
           !!typeLabel ||
           !!statusLabel ||
@@ -1091,6 +1117,14 @@ export function TransactionsFilterBar({
                 label={t('transactions.hideIgnored')}
                 value={t('transactions.ignoredHiddenValue')}
                 onRemove={() => onHideIgnoredChange(false)}
+              />
+            )}
+            {filterHasSuggestion && (
+              <FilterChip
+                icon={<Sparkles size={12} />}
+                label={t('transactions.hasSuggestion')}
+                value={t('transactions.hasSuggestionOnly')}
+                onRemove={() => onHasSuggestionChange(false)}
               />
             )}
             {dateLabel && (

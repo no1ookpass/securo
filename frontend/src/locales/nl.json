@@ -977,6 +977,8 @@
     "sortDesc": "Sorteer aflopend",
     "syncedInfo": "Bankgesynchroniseerde transactie: bedrag, datum en rekening kunnen niet worden bewerkt",
     "uncategorized": "Niet gecategoriseerd",
+    "hasSuggestion": "Heeft suggestie",
+    "hasSuggestionOnly": "Met suggestie",
     "selected": "geselecteerd",
     "summaryCount": "{{count}} transacties",
     "summaryIncome": "Inkomen",
@@ -1156,8 +1158,7 @@
     "categorySuggestionTooltip": "Voorgesteld op basis van {{count}} eerdere keuzes voor {{matched}}. Wordt pas toegepast als je accepteert.",
     "categorySuggestionAccept": "Voorgestelde categorie accepteren",
     "categorySuggestionDismiss": "Suggestie negeren",
-    "clearGroupFilter": "Groepsfilter wissen",
-    "reviewCategories": "Categorieën controleren"
+    "clearGroupFilter": "Groepsfilter wissen"
   },
   "accounts": {
     "title": "Rekeningen",
@@ -2991,12 +2992,5 @@
       "recurring": "Regels voor Terugkerend",
       "recurringHint": "Hoe we bepalen dat een afschrijving de rekening is die je al verwachtte."
     }
-  },
-  "categorisation": {
-    "title": "Categorieën controleren",
-    "subtitle": "Rijen die je geschiedenis kan indelen. Er verandert niets tot je accepteert.",
-    "empty": "Op dit moment niets te controleren.",
-    "acceptAll": "Alle {{count}} accepteren",
-    "accepted": "{{count}} gecategoriseerd"
   }
 }

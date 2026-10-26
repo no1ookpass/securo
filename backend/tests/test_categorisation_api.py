@@ -375,10 +375,16 @@ async def test_a_tie_still_abstains(session: AsyncSession, client: AsyncClient, 
 
 
 @pytest.mark.asyncio
-async def test_the_queue_returns_whole_rows_most_supported_first(
+async def test_the_list_filter_shows_only_rows_the_history_can_file(
     session: AsyncSession, client: AsyncClient, auth_headers: dict,
     test_user, test_workspace,
 ):
+    """The "has suggestion" filter must describe the list, not the page.
+
+    It exists so the backlog can be worked through in the ordinary table, which
+    only works if the filter is resolved against everything - a filter that
+    looked at one page would report "nothing left" the moment that page ran dry.
+    """
     account = await _account(session, test_workspace.id, test_user.id)
     groceries = await _category(session, test_workspace.id, test_user.id, "Groceries")
     fuel = await _category(session, test_workspace.id, test_user.id, "Transport")
@@ -390,7 +396,11 @@ async def test_the_queue_returns_whole_rows_most_supported_first(
         id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
         name="Gull", source="sync",
     )
-    session.add_all([woolworths, gull])
+    stranger = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Somewhere New", source="sync",
+    )
+    session.add_all([woolworths, gull, stranger])
     await session.flush()
 
     for i in range(4):
@@ -412,24 +422,69 @@ async def test_the_queue_returns_whole_rows_most_supported_first(
         workspace_id=test_workspace.id, payee=gull,
         description="GULL PUKEKOHE", category=None, when=BASE + timedelta(days=20),
     )
-    await _transaction(
+    older = await _transaction(
         session, account=account, user_id=test_user.id,
         workspace_id=test_workspace.id, payee=woolworths,
         description="Woolworths Online Favona", category=None,
         when=BASE + timedelta(days=21),
     )
+    # No history behind this one, so the memory has nothing to say about it.
+    await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=stranger,
+        description="SOMETHING UNSEEN 4471", category=None,
+        when=BASE + timedelta(days=22),
+    )
     await session.commit()
 
-    response = await client.get("/api/categorisation/queue", headers=auth_headers)
+    response = await client.get(
+        "/api/transactions", params={"has_suggestion": "true"}, headers=auth_headers,
+    )
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 2
-    # Woolworths has four decisions behind it, Gull two: the fuller one leads.
-    assert body[0]["category_name"] == "Groceries"
-    assert body[0]["evidence"] == 4
-    assert body[1]["category_name"] == "Transport"
-    # Whole rows come back, so the page renders without a second request.
-    assert body[0]["description"]
-    assert body[0]["account_name"] == "Everyday"
-    assert body[0]["currency"] == "NZD"
-    assert body[1]["transaction_id"] == str(recent.id)
+    assert {item["id"] for item in body["items"]} == {str(recent.id), str(older.id)}
+    assert body["total"] == 2
+
+    # Both are reachable through pagination, which is the point of resolving the
+    # filter up front instead of trimming whatever arrived on the page.
+    first = await client.get(
+        "/api/transactions",
+        params={"has_suggestion": "true", "limit": 1, "page": 1},
+        headers=auth_headers,
+    )
+    second = await client.get(
+        "/api/transactions",
+        params={"has_suggestion": "true", "limit": 1, "page": 2},
+        headers=auth_headers,
+    )
+    assert first.json()["total"] == 2
+    assert second.json()["total"] == 2
+    assert len(first.json()["items"]) == 1
+    assert first.json()["items"][0]["id"] != second.json()["items"][0]["id"]
+
+
+async def test_the_list_filter_is_empty_when_nothing_can_be_filed(
+    session: AsyncSession, client: AsyncClient, auth_headers: dict,
+    test_user, test_workspace,
+):
+    account = await _account(session, test_workspace.id, test_user.id)
+    stranger = Payee(
+        id=uuid.uuid4(), user_id=test_user.id, workspace_id=test_workspace.id,
+        name="Somewhere New", source="sync",
+    )
+    session.add(stranger)
+    await session.flush()
+    await _transaction(
+        session, account=account, user_id=test_user.id,
+        workspace_id=test_workspace.id, payee=stranger,
+        description="SOMETHING UNSEEN 4471", category=None, when=BASE,
+    )
+    await session.commit()
+
+    response = await client.get(
+        "/api/transactions", params={"has_suggestion": "true"}, headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [], "total": 0, "page": 1, "limit": 50, "summary": None,
+    }

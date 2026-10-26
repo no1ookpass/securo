@@ -977,6 +977,8 @@
     "sortDesc": "降順で並べ替え",
     "syncedInfo": "銀行同期の取引：金額、日付、口座は編集できません",
     "uncategorized": "未分類",
+    "hasSuggestion": "提案あり",
+    "hasSuggestionOnly": "提案ありのみ",
     "selected": "件選択中",
     "summaryCount": "{{count}}件",
     "summaryIncome": "収入",
@@ -1156,8 +1158,7 @@
     "categorySuggestionTooltip": "{{matched}} に対する過去 {{count}} 件の判断からの提案です。承認するまで適用されません。",
     "categorySuggestionAccept": "提案されたカテゴリを承認",
     "categorySuggestionDismiss": "提案を却下",
-    "clearGroupFilter": "グループフィルターを解除",
-    "reviewCategories": "カテゴリを確認"
+    "clearGroupFilter": "グループフィルターを解除"
   },
   "accounts": {
     "title": "口座",
@@ -2989,12 +2990,5 @@
       "recurring": "定期のルール",
       "recurringHint": "ある引き落としが予定していた支払いだと判断する方法。"
     }
-  },
-  "categorisation": {
-    "title": "カテゴリを確認",
-    "subtitle": "これまでの履歴から分類できる行です。承認するまで何も変わりません。",
-    "empty": "確認する項目はありません。",
-    "acceptAll": "{{count}} 件をすべて承認",
-    "accepted": "{{count}} 件を分類しました"
   }
 }

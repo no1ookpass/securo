@@ -19,6 +19,7 @@ from app.core.workspace_context import (
 from app.schemas.transaction import BulkAddToGroupRequest, BulkCategorizeRequest, DescriptionSuggestion, BulkTagsRequest, CreateCounterpartRequest, InstallmentSeriesCreate, LinkTransferRequest, TransactionBulkDeleteRequest, TransactionCreate, TransactionRead, TransactionUpdate, TransferCreate, TransferRead
 from app.schemas.transaction_calendar import TransactionCalendarResponse
 from app.services import transaction_service
+from app.services import categorisation_memory
 from app.services.admin_service import get_credit_card_accounting_mode
 from app.services.transaction_calendar_service import get_transaction_calendar
 
@@ -121,6 +122,13 @@ async def list_transactions(
     unbilled_only: bool = Query(False, description="Cycle-math fallback only: exclude txs already linked to any bill (used for in-progress CC cycles)"),
     q: Optional[str] = Query(None),
     uncategorized: bool = Query(False),
+    has_suggestion: bool = Query(
+        False,
+        description=(
+            "Only rows this workspace's history can categorise. Resolved against the "
+            "whole backlog, so it paginates like any other filter."
+        ),
+    ),
     type: Optional[str] = Query(None),
     status: Optional[str] = Query(None, description="Filter by transaction status (posted|pending)"),
     page: int = Query(1, ge=1),
@@ -139,6 +147,23 @@ async def list_transactions(
     session: AsyncSession = Depends(get_async_session),
 ):
     accounting_mode = await get_credit_card_accounting_mode(session)
+
+    # "Has suggestion" is not a column - it is the output of the learned memory,
+    # which grades descriptions with Python. Resolving it to ids up front keeps
+    # the list a single paginated query and, more importantly, makes the filter
+    # describe the whole result set rather than the page that happens to be on
+    # screen: filtering only the visible page would report "nothing left to
+    # review" while the backlog was still hundreds of rows deep.
+    suggested_ids: Optional[list[uuid.UUID]] = None
+    if has_suggestion:
+        suggested_ids = sorted(
+            await categorisation_memory.suggestion_ids(session, ctx.workspace.id)
+        )
+        if not suggested_ids:
+            return PaginatedTransactions(
+                items=[], total=0, page=page, limit=limit, summary=None
+            )
+
     transactions, total, summary = await transaction_service.get_transactions(
         session, ctx.workspace.id, ctx.user_id,
         account_ids=_merge_id_filters(account_id, account_ids),
@@ -158,6 +183,7 @@ async def list_transactions(
         sort_dir=sort_dir,
         min_amount=min_amount,
         max_amount=max_amount,
+        transaction_ids=suggested_ids,
         include_summary=True,
         include_running_balance=include_running_balance,
         primary_currency=ctx.user.primary_currency,

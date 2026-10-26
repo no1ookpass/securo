@@ -6,8 +6,6 @@ that already requires a human.
 """
 
 import uuid
-from datetime import date
-from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel
@@ -29,13 +27,3 @@ class CategorisationSuggestionRead(BaseModel):
     source: Literal["payee", "description"]
     #: The payee name or the token that matched, for showing its origin.
     matched: str
-
-
-class CategorisationQueueItemRead(CategorisationSuggestionRead):
-    """A suggestion plus the row it belongs to, for the review queue."""
-
-    description: str
-    date: date
-    amount: Decimal
-    currency: str
-    account_name: str

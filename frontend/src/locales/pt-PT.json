@@ -979,6 +979,8 @@
     "sortDesc": "Ordem decrescente",
     "syncedInfo": "Transação sincronizada: valor, data e conta não podem ser editados",
     "uncategorized": "Sem categoria",
+    "hasSuggestion": "Tem sugestão",
+    "hasSuggestionOnly": "Com sugestão",
     "selected": "selecionadas",
     "summaryCount": "{{count}} transações",
     "summaryIncome": "Receitas",
@@ -1158,8 +1160,7 @@
     "categorySuggestionTooltip": "Sugerido a partir de {{count}} decisões anteriores para {{matched}}. Só é aplicado depois de aceitar.",
     "categorySuggestionAccept": "Aceitar a categoria sugerida",
     "categorySuggestionDismiss": "Dispensar a sugestão",
-    "clearGroupFilter": "Limpar filtro de grupo",
-    "reviewCategories": "Rever categorias"
+    "clearGroupFilter": "Limpar filtro de grupo"
   },
   "accounts": {
     "title": "Contas",
@@ -2993,12 +2994,5 @@
       "recurring": "Regras de Recorrentes",
       "recurringHint": "Como decidimos que uma cobrança é a conta que já esperava."
     }
-  },
-  "categorisation": {
-    "title": "Rever categorias",
-    "subtitle": "Linhas que o seu histórico pode classificar. Nada muda até aceitar.",
-    "empty": "Nada para rever neste momento.",
-    "acceptAll": "Aceitar todas as {{count}}",
-    "accepted": "{{count}} categorizadas"
   }
 }

@@ -979,6 +979,8 @@
     "sortDesc": "Orden descendente",
     "syncedInfo": "Transacción sincronizada con el banco: el importe, la fecha y la cuenta no se pueden editar",
     "uncategorized": "Sin categorizar",
+    "hasSuggestion": "Tiene sugerencia",
+    "hasSuggestionOnly": "Con sugerencia",
     "selected": "seleccionado",
     "summaryCount": "{{count}} transacciones",
     "summaryIncome": "Ingresos",
@@ -1158,8 +1160,7 @@
     "categorySuggestionTooltip": "Sugerido a partir de {{count}} decisiones anteriores para {{matched}}. No se aplica hasta que lo aceptes.",
     "categorySuggestionAccept": "Aceptar la categoría sugerida",
     "categorySuggestionDismiss": "Descartar la sugerencia",
-    "clearGroupFilter": "Quitar filtro de grupo",
-    "reviewCategories": "Revisar categorías"
+    "clearGroupFilter": "Quitar filtro de grupo"
   },
   "accounts": {
     "title": "Cuentas",
@@ -2993,12 +2994,5 @@
       "recurring": "Reglas de Recurrentes",
       "recurringHint": "Cómo decidimos que un cargo es la cuenta que ya esperabas."
     }
-  },
-  "categorisation": {
-    "title": "Revisar categorías",
-    "subtitle": "Filas que tu historial puede clasificar. Nada cambia hasta que aceptes.",
-    "empty": "Nada que revisar ahora mismo.",
-    "acceptAll": "Aceptar las {{count}}",
-    "accepted": "{{count}} categorizadas"
   }
 }

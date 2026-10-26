@@ -977,6 +977,8 @@
     "sortDesc": "Absteigend sortieren",
     "syncedInfo": "Bank-synchronisierte Transaktion: Betrag, Datum und Konto können nicht bearbeitet werden",
     "uncategorized": "Nicht kategorisiert",
+    "hasSuggestion": "Hat Vorschlag",
+    "hasSuggestionOnly": "Mit Vorschlag",
     "selected": "ausgewählt",
     "summaryCount": "{{count}} Transaktionen",
     "summaryIncome": "Einnahmen",
@@ -1156,8 +1158,7 @@
     "categorySuggestionTooltip": "Vorschlag aus {{count}} früheren Entscheidungen für {{matched}}. Wird erst nach Bestätigung angewendet.",
     "categorySuggestionAccept": "Vorgeschlagene Kategorie übernehmen",
     "categorySuggestionDismiss": "Vorschlag verwerfen",
-    "clearGroupFilter": "Gruppenfilter entfernen",
-    "reviewCategories": "Kategorien prüfen"
+    "clearGroupFilter": "Gruppenfilter entfernen"
   },
   "accounts": {
     "title": "Konten",
@@ -2990,12 +2991,5 @@
       "recurring": "Regeln für Wiederkehrendes",
       "recurringHint": "Wie wir entscheiden, dass eine Buchung die erwartete Rechnung ist."
     }
-  },
-  "categorisation": {
-    "title": "Kategorien prüfen",
-    "subtitle": "Zeilen, die deine Historie einsortieren kann. Nichts ändert sich, bis du bestätigst.",
-    "empty": "Im Moment nichts zu prüfen.",
-    "acceptAll": "Alle {{count}} übernehmen",
-    "accepted": "{{count}} kategorisiert"
   }
 }

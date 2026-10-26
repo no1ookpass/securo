@@ -7,7 +7,7 @@ import { loadRange, saveRange } from '@/lib/remembered-range'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useDisplayLocale, useDateLocale } from '@/hooks/use-display-locale'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { transactions, categories as categoriesApi, categoryGroups as categoryGroupsApi, accounts as accountsApi, recurring, payees as payeesApi, admin, groups as groupsApi, rules as rulesApi, reconciliation as reconciliationApi, categorisation } from '@/lib/api'
 import { invalidateFinancialQueries } from '@/lib/invalidate-queries'
 import { toast } from 'sonner'
@@ -131,6 +131,11 @@ export default function TransactionsPage() {
     return initial ? [initial] : []
   })
   const [filterUncategorized, setFilterUncategorized] = useState<boolean>(false)
+  // Rows this workspace's own history could file. Resolved by the server over
+  // the whole backlog, so it narrows the list rather than the page on screen.
+  const [filterHasSuggestion, setFilterHasSuggestion] = useState<boolean>(
+    () => searchParams.get('has_suggestion') === '1',
+  )
   // Seed the date range from the URL, else the range last used on this page
   // (issue #1053), else the current month. Done in the initializer so it
   // survives effect re-runs (e.g. React StrictMode's double-invoke in
@@ -270,6 +275,7 @@ export default function TransactionsPage() {
     const categories = searchParams.get('category_id');
     setFilterCategoryIds(categories ? categories.split(',') : []);
     setFilterUncategorized(searchParams.get('uncategorized') === '1');
+    setFilterHasSuggestion(searchParams.get('has_suggestion') === '1');
     const accounts = searchParams.get('account_id');
     setFilterAccountIds(accounts ? accounts.split(',') : []);
     const urlFrom = searchParams.get('from')
@@ -304,6 +310,7 @@ export default function TransactionsPage() {
         ['status', filterStatus],
         ['category_id', filterCategoryIds.join(',')],
         ['uncategorized', filterUncategorized ? '1' : ''],
+        ['has_suggestion', filterHasSuggestion ? '1' : ''],
         ['account_id', filterAccountIds.join(',')],
         ['from', filterFrom],
         ['to', filterTo],
@@ -329,6 +336,7 @@ export default function TransactionsPage() {
     filterStatus,
     filterCategoryIds,
     filterUncategorized,
+    filterHasSuggestion,
     filterAccountIds,
     filterFrom,
     filterTo,
@@ -401,7 +409,7 @@ export default function TransactionsPage() {
     && activeAccountIds !== null && activeAccountIds.length === 0
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['transactions', page, limit, effectiveAccountIds, filterCategoryIds, filterUncategorized, filterPayee, filterGroupId, filterType, filterStatus, filterFrom, filterTo, filterMinAmount, filterMaxAmount, hideIgnored, searchQuery, tagFilters, isMobile ? 'date' : grid.sortBy, isMobile ? 'desc' : grid.sortDir],
+    queryKey: ['transactions', page, limit, effectiveAccountIds, filterCategoryIds, filterUncategorized, filterHasSuggestion, filterPayee, filterGroupId, filterType, filterStatus, filterFrom, filterTo, filterMinAmount, filterMaxAmount, hideIgnored, searchQuery, tagFilters, isMobile ? 'date' : grid.sortBy, isMobile ? 'desc' : grid.sortDir],
     enabled: !noAccounts,
     queryFn: () =>
       transactions.list({
@@ -414,6 +422,7 @@ export default function TransactionsPage() {
         type: filterType || undefined,
         status: filterStatus || undefined,
         uncategorized: filterUncategorized ? true : undefined,
+        has_suggestion: filterHasSuggestion ? true : undefined,
         from: filterFrom || undefined,
         to: filterTo || undefined,
         min_amount: filterMinAmount ? Number(filterMinAmount) : undefined,
@@ -447,6 +456,12 @@ export default function TransactionsPage() {
     queryKey: ['categorisation-suggestions', uncategorisedIds.join(',')],
     enabled: uncategorisedIds.length > 0,
     staleTime: 60_000,
+    // The key is the set of uncategorised ids on screen, so accepting one row
+    // changes the key and would normally blank every chip on the page while the
+    // new response was in flight. Keeping the previous answer means the page
+    // settles instead of flashing: a suggestion is only ever withdrawn because
+    // it was acted on, so there is nothing to gain from hiding the rest.
+    placeholderData: keepPreviousData,
     queryFn: () => categorisation.suggestions(uncategorisedIds),
   })
   const categorySuggestionById = useMemo(
@@ -1136,7 +1151,26 @@ export default function TransactionsPage() {
 
   /** Accept a proposed category: the ordinary update, nothing special. */
   const acceptCategorySuggestion = (tx: Transaction, suggestion: CategorisationSuggestion) => {
-    updateMutation.mutate({ id: tx.id, category_id: suggestion.category_id })
+    // Hide this one chip straight away. The row itself still waits for the
+    // update to land and the list to refetch - that is the part worth being
+    // sure about - but a tick that looks like it did nothing until a fetch
+    // returns reads as broken, and this particular prediction cannot be wrong:
+    // the user has just decided the row's category.
+    setDismissedSuggestions((prev) => new Set(prev).add(tx.id))
+    updateMutation.mutate(
+      { id: tx.id, category_id: suggestion.category_id },
+      {
+        onError: () => {
+          // Nothing was written, so put the proposal back rather than leaving
+          // the user with a row that silently lost its suggestion.
+          setDismissedSuggestions((prev) => {
+            const next = new Set(prev)
+            next.delete(tx.id)
+            return next
+          })
+        },
+      },
+    )
   }
 
   const dismissCategorySuggestion = (transactionId: string) => {
@@ -1198,7 +1232,11 @@ export default function TransactionsPage() {
                 this session, and doing nothing leaves the row uncategorised. */}
             {(() => {
               const suggestion = categorySuggestionById.get(tx.id)
-              if (!suggestion || dismissedSuggestions.has(tx.id)) return null
+              // A categorised row has nothing to be suggested: the answer is
+              // already on the row. This also covers the moment between
+              // accepting a proposal and the list refetch returning, when the
+              // stale suggestion would otherwise still be in hand.
+              if (!suggestion || dismissedSuggestions.has(tx.id) || tx.category_id) return null
               return (
                 <span
                   className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900 px-1.5 py-0.5 rounded-full"
@@ -1514,16 +1552,6 @@ export default function TransactionsPage() {
         }
       />
 
-      <div className="flex justify-end">
-        <Link
-          to="/transactions/review-categories"
-          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          {t('transactions.reviewCategories')}
-        </Link>
-      </div>
-
       {/* Filters */}
       <TransactionsFilterBar
         searchInput={searchInput}
@@ -1558,6 +1586,21 @@ export default function TransactionsPage() {
         onStatusChange={(v) => { setFilterStatus(v); setPage(1) }}
         hideIgnored={hideIgnored}
         onHideIgnoredChange={handleHideIgnoredChange}
+        filterHasSuggestion={filterHasSuggestion}
+        onHasSuggestionChange={(v) => {
+          setFilterHasSuggestion(v)
+          // The page opens on a month range, and a backlog is not a month: the
+          // suggestions are spread across the whole history, so keeping the
+          // range would answer "rows I can file" with whichever handful happen
+          // to fall in the current month - and read as an empty feature.
+          // Switching the filter on is a request to see the backlog, so the
+          // range goes with it (the date chip disappearing says so).
+          if (v) {
+            setFilterFrom('')
+            setFilterTo('')
+          }
+          setPage(1)
+        }}
         filterFrom={filterFrom}
         filterTo={filterTo}
         onDateRangeChange={(from, to) => { setFilterFrom(from); setFilterTo(to); setPage(1) }}
@@ -1576,6 +1619,7 @@ export default function TransactionsPage() {
           setFilterStatus('')
           setFilterMinAmount('')
           setFilterMaxAmount('')
+          setFilterHasSuggestion(false)
           handleHideIgnoredChange(false)
           setSearchInput('')
           setSearchQuery('')

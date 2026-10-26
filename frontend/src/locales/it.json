@@ -979,6 +979,8 @@
     "sortDesc": "Ordine decrescente",
     "syncedInfo": "Transazione sincronizzata dalla banca: importo, data e conto non possono essere modificati",
     "uncategorized": "Senza categoria",
+    "hasSuggestion": "Ha suggerimento",
+    "hasSuggestionOnly": "Con suggerimento",
     "selected": "selezionate",
     "summaryCount": "{{count}} transazioni",
     "summaryIncome": "Entrate",
@@ -1158,8 +1160,7 @@
     "categorySuggestionTooltip": "Suggerito da {{count}} decisioni precedenti per {{matched}}. Non viene applicato finché non lo accetti.",
     "categorySuggestionAccept": "Accetta la categoria suggerita",
     "categorySuggestionDismiss": "Ignora il suggerimento",
-    "clearGroupFilter": "Rimuovi filtro gruppo",
-    "reviewCategories": "Controlla le categorie"
+    "clearGroupFilter": "Rimuovi filtro gruppo"
   },
   "accounts": {
     "title": "Conti",
@@ -2993,12 +2994,5 @@
       "recurring": "Regole Ricorrenti",
       "recurringHint": "Come decidiamo che un addebito è la bolletta che stavi già aspettando."
     }
-  },
-  "categorisation": {
-    "title": "Controlla le categorie",
-    "subtitle": "Righe che la tua cronologia può classificare. Nulla cambia finché non accetti.",
-    "empty": "Niente da controllare al momento.",
-    "acceptAll": "Accetta tutte le {{count}}",
-    "accepted": "{{count}} categorizzate"
   }
 }

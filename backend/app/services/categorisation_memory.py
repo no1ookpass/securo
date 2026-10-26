@@ -37,7 +37,6 @@ from typing import Iterable, Literal, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import Transaction
 
@@ -269,13 +268,18 @@ class CategoryMemory:
         # matching several weak tokens at once. A token shared by more than one
         # merchant is not evidence about either of them.
         best: Optional[Suggestion] = None
-        best_rank: tuple[int, float] = (0, 0.0)
+        best_rank: tuple[int, float, int] = (0, 0.0, 0)
         shared_prefixes = {
             prefix
             for prefix, merchants in self._prefix_merchants.items()
             if len(merchants) > MAX_PREFIX_MERCHANTS
         }
-        for token in normalise_tokens(description):
+        # Sorted, because `normalise_tokens` hands back a set: without this the
+        # winner between two equally supported tokens is decided by hash order,
+        # so the same row could be explained as "uber" on one run and "eats" on
+        # the next. Two tokens that carry the same evidence are otherwise
+        # indistinguishable.
+        for token in sorted(normalise_tokens(description)):
             if token in shared_prefixes:
                 continue
             if len(self._token_payees.get(token, ())) > MAX_TOKEN_PAYEES:
@@ -285,7 +289,10 @@ class CategoryMemory:
             if vote is None:
                 continue
             category_id, share, total = vote
-            rank = (total, share)
+            # On a tie, prefer the merchant over an aggregator's prefix: an
+            # "UBER * EATS" charge is a takeaway, and "UBER" is only the
+            # company that processed the payment.
+            rank = (total, share, 0 if token in self._prefix_merchants else 1)
             if rank <= best_rank:
                 continue
             best_rank = rank
@@ -321,7 +328,7 @@ async def grade_uncategorised(
     workspace_id: uuid.UUID,
     *,
     transaction_ids: Optional[Iterable[uuid.UUID]] = None,
-    limit: int = 50,
+    limit: Optional[int] = 50,
     min_evidence: int = MIN_EVIDENCE,
     min_share: float = MIN_SHARE,
 ) -> list[GradedTransaction]:
@@ -329,8 +336,11 @@ async def grade_uncategorised(
 
     ``transaction_ids`` grades exactly those rows (the page in front of the
     user); without it the workspace's newest uncategorised rows are graded, up
-    to ``limit``. Rows the memory is not sure about are simply absent from the
-    result - the caller shows a chip for what came back and nothing otherwise.
+    to ``limit``. ``limit=None`` grades everything, which is what the list
+    filter needs: a filter that only looked at one page would hide most of the
+    backlog it claims to show. Rows the memory is not sure about are simply
+    absent from the result - the caller shows a chip for what came back and
+    nothing otherwise.
     """
     stmt = select(
         Transaction.id,
@@ -349,7 +359,9 @@ async def grade_uncategorised(
             return []
         stmt = stmt.where(Transaction.id.in_(ids))
     else:
-        stmt = stmt.order_by(Transaction.date.desc(), Transaction.id).limit(limit)
+        stmt = stmt.order_by(Transaction.date.desc(), Transaction.id)
+        if limit is not None:
+            stmt = stmt.limit(limit)
 
     candidates = (await session.execute(stmt)).all()
     if not candidates:
@@ -406,114 +418,28 @@ async def grade_uncategorised(
     ]
 
 
-@dataclass(frozen=True)
-class QueueItem:
-    """One row of the review queue: the transaction and its proposal."""
-
-    transaction_id: uuid.UUID
-    description: str
-    date: object
-    amount: object
-    currency: str
-    account_name: str
-    category_id: uuid.UUID
-    category_name: str
-    confidence: float
-    evidence: int
-    agreed: int
-    source: Literal["payee", "description"]
-    matched: str
-
-
-async def grade_queue(
+async def suggestion_ids(
     session: AsyncSession,
     workspace_id: uuid.UUID,
     *,
-    limit: int = 200,
     min_evidence: int = MIN_EVIDENCE,
     min_share: float = MIN_SHARE,
-) -> list[QueueItem]:
-    """Everything the workspace could categorise now, best-supported first.
+) -> set[uuid.UUID]:
+    """Every uncategorised row this workspace's history could file right now.
 
-    The same grading as :func:`grade_uncategorised`, but it returns the whole
-    row so a review page can render it without a second query, and it sorts by
-    evidence so the merchants with the most history come first - that is the
-    order a person clears a backlog in, one merchant at a time.
+    Backs the transactions list's "has suggestion" filter. Grading only the page
+    in front of the user would make the filter lie about the rest of the list -
+    it would claim there is nothing more to review as soon as the current page
+    ran dry - so this grades the whole backlog and lets the list paginate it.
     """
-    candidates = (
-        await session.execute(
-            select(
-                Transaction.id,
-                Transaction.description,
-                Transaction.date,
-                Transaction.amount,
-                Transaction.currency,
-                Transaction.payee_id,
-                Transaction.payee,
-                Account.name,
-            )
-            .join(Account, Account.id == Transaction.account_id)
-            .where(
-                Transaction.workspace_id == workspace_id,
-                Transaction.category_id.is_(None),
-                Transaction.is_ignored.is_(False),
-                Transaction.source != "opening_balance",
-            )
-            .order_by(Transaction.date.desc(), Transaction.id)
-            .limit(limit)
-        )
-    ).all()
-    if not candidates:
-        return []
-
-    memory = await load_memory(session, workspace_id)
-
-    proposed: list[tuple[object, Suggestion]] = []
-    for row in candidates:
-        suggestion = memory.suggest(
-            payee_id=row.payee_id,
-            description=row.description,
-            payee_name=row.payee,
-            min_evidence=min_evidence,
-            min_share=min_share,
-        )
-        if suggestion is not None:
-            proposed.append((row, suggestion))
-    if not proposed:
-        return []
-
-    names = {
-        category.id: category.name
-        for category in await session.execute(
-            select(Category.id, Category.name).where(
-                Category.id.in_({s.category_id for _, s in proposed})
-            )
-        )
-    }
-    items = [
-        QueueItem(
-            transaction_id=row.id,
-            description=row.description,
-            date=row.date,
-            amount=row.amount,
-            currency=row.currency,
-            account_name=row.name,
-            category_id=suggestion.category_id,
-            category_name=names.get(suggestion.category_id, ""),
-            confidence=suggestion.confidence,
-            evidence=suggestion.evidence,
-            agreed=suggestion.votes.get(suggestion.category_id, 0),
-            source=suggestion.source,
-            matched=suggestion.matched,
-        )
-        for row, suggestion in proposed
-    ]
-    # Most-supported first, then the strongest agreement, then newest.
-    return sorted(
-        items,
-        key=lambda item: (item.evidence, item.confidence, item.date),
-        reverse=True,
+    graded = await grade_uncategorised(
+        session,
+        workspace_id,
+        limit=None,
+        min_evidence=min_evidence,
+        min_share=min_share,
     )
+    return {g.transaction_id for g in graded}
 
 
 async def load_memory(

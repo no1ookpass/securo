@@ -287,15 +287,6 @@ export interface CategorisationSuggestion {
   matched: string
 }
 
-/** A queue entry: the suggestion plus the row it belongs to. */
-export interface CategorisationQueueItem extends CategorisationSuggestion {
-  description: string
-  date: string
-  amount: number
-  currency: string
-  account_name: string
-}
-
 export interface Transaction {
   /** Every invoice this transaction settles — a payout net of fees
    *  settles several. Absent in a workspace without the module. */

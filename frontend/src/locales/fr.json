@@ -979,6 +979,8 @@
     "sortDesc": "Trier par ordre décroissant",
     "syncedInfo": "Transaction synchronisée depuis la banque : le montant, la date et le compte ne peuvent pas être modifiés",
     "uncategorized": "Non catégorisée",
+    "hasSuggestion": "A une suggestion",
+    "hasSuggestionOnly": "Avec suggestion",
     "selected": "sélectionnée(s)",
     "summaryCount": "{{count}} transactions",
     "summaryIncome": "Revenus",
@@ -1158,8 +1160,7 @@
     "categorySuggestionTooltip": "Suggéré à partir de {{count}} décisions précédentes pour {{matched}}. Appliqué seulement après votre acceptation.",
     "categorySuggestionAccept": "Accepter la catégorie suggérée",
     "categorySuggestionDismiss": "Ignorer la suggestion",
-    "clearGroupFilter": "Effacer le filtre de groupe",
-    "reviewCategories": "Vérifier les catégories"
+    "clearGroupFilter": "Effacer le filtre de groupe"
   },
   "accounts": {
     "title": "Comptes",
@@ -2993,12 +2994,5 @@
       "recurring": "Règles Récurrentes",
       "recurringHint": "Comment nous décidons qu’un prélèvement est la facture que vous attendiez."
     }
-  },
-  "categorisation": {
-    "title": "Vérifier les catégories",
-    "subtitle": "Des lignes que votre historique peut classer. Rien ne change tant que vous n'acceptez pas.",
-    "empty": "Rien à vérifier pour le moment.",
-    "acceptAll": "Accepter les {{count}}",
-    "accepted": "{{count}} catégorisées"
   }
 }
