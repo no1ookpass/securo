@@ -63,6 +63,14 @@ BACKTEST_THRESHOLDS: tuple[tuple[int, float], ...] = ((1, 0.6), (2, 0.6), (3, 0.
 #: "payee", which is why the import/manual fallback still works.
 MAX_TOKEN_PAYEES = 1
 
+#: How many different merchants may sit behind one ``PREFIX*`` before the prefix
+#: stops counting as evidence. Same idea as :data:`MAX_TOKEN_PAYEES`, because the
+#: same mistake showed up in a different disguise: tokens are drawn from the
+#: whole descriptor, and a payment aggregator's prefix is a token too, but it
+#: names the gateway rather than the shop. One prefix with several shops behind
+#: it is a gateway; one shop is that shop's own word.
+MAX_PREFIX_MERCHANTS = 1
+
 #: Card-processor and settlement noise that carries no identity. Place and store
 #: names are deliberately absent: they are exactly the part that varies, and
 #: keeping them out of the token set is what lets the same brand match across
@@ -89,6 +97,11 @@ _CODE_SHAPE = re.compile(r"^[a-z]{1,3}\d+$|^\d+[a-z]{1,3}$")
 
 _SPLIT = re.compile(r"[^0-9a-z]+")
 
+#: ``SMZ*Vapeys``: the part before the asterisk is a card aggregator, the part
+#: after it is the shop. A space before the asterisk (``UBER * EATS``) is a
+#: brand's own format and is left alone.
+_STAR_PREFIX = re.compile(r"(?<![0-9a-z])([a-z0-9]{2,12})\*")
+
 
 def normalise_tokens(text: Optional[str]) -> frozenset[str]:
     """Turn a bank descriptor into the set of tokens that identify the merchant.
@@ -108,6 +121,33 @@ def normalise_tokens(text: Optional[str]) -> frozenset[str]:
         and token not in _NOISE_TOKENS
         and not _CODE_SHAPE.match(token)
     )
+
+
+def star_prefix_merchants(text: Optional[str]) -> frozenset[tuple[str, str]]:
+    """The ``(prefix, merchant)`` pairs a descriptor contains.
+
+    ``SMZ*Vapeys Silverdale`` and ``SMZ*The Avenue Hair`` are two unrelated
+    shops billed through one aggregator. The prefix is not the shop, so it must
+    not be taught as one: without this, 27 decisions about a vape shop voted
+    "Hayden Splash" for a $1292 hair salon charge at full confidence. The
+    merchant half is the first token after the asterisk that would itself have
+    been usable as a token.
+    """
+    if not text:
+        return frozenset()
+    lowered = text.lower()
+    pairs = set()
+    for match in _STAR_PREFIX.finditer(lowered):
+        for token in _SPLIT.split(lowered[match.end() :]):
+            if (
+                len(token) > 1
+                and not token.isdigit()
+                and token not in _NOISE_TOKENS
+                and not _CODE_SHAPE.match(token)
+            ):
+                pairs.add((match.group(1), token))
+                break
+    return frozenset(pairs)
 
 
 @dataclass(frozen=True)
@@ -138,6 +178,11 @@ class CategoryMemory:
         self._by_payee: dict[uuid.UUID, Counter[uuid.UUID]] = {}
         self._by_token: dict[str, Counter[uuid.UUID]] = {}
         self._token_payees: dict[str, set[Optional[uuid.UUID]]] = {}
+        self._prefix_merchants: dict[str, set[str]] = {}
+
+    def _note_prefixes(self, description: Optional[str]) -> None:
+        for prefix, merchant in star_prefix_merchants(description):
+            self._prefix_merchants.setdefault(prefix, set()).add(merchant)
 
     def add(
         self,
@@ -149,6 +194,7 @@ class CategoryMemory:
         """Record one confirmed decision. Every categorisation is learning."""
         if payee_id is not None:
             self._by_payee.setdefault(payee_id, Counter())[category_id] += 1
+        self._note_prefixes(description)
         for token in normalise_tokens(description):
             self._by_token.setdefault(token, Counter())[category_id] += 1
             self._token_payees.setdefault(token, set()).add(payee_id)
@@ -169,6 +215,7 @@ class CategoryMemory:
         a word that turns up under more than one merchant anywhere is not
         evidence about either of them.
         """
+        self._note_prefixes(description)
         for token in normalise_tokens(description):
             self._token_payees.setdefault(token, set()).add(payee_id)
 
@@ -223,7 +270,14 @@ class CategoryMemory:
         # merchant is not evidence about either of them.
         best: Optional[Suggestion] = None
         best_rank: tuple[int, float] = (0, 0.0)
+        shared_prefixes = {
+            prefix
+            for prefix, merchants in self._prefix_merchants.items()
+            if len(merchants) > MAX_PREFIX_MERCHANTS
+        }
         for token in normalise_tokens(description):
+            if token in shared_prefixes:
+                continue
             if len(self._token_payees.get(token, ())) > MAX_TOKEN_PAYEES:
                 continue
             counter = self._by_token.get(token)

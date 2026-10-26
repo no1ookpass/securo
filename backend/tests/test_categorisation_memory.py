@@ -199,6 +199,46 @@ def test_a_token_seen_under_one_merchant_still_works():
     assert suggestion.matched == "warehouse"
 
 
+def test_a_payment_aggregator_prefix_is_not_a_merchant():
+    """`SMZ*` bills a vape shop and a hair salon through the same gateway.
+
+    The prefix is a token in the descriptor, so 27 decisions about "SMZ*Vapeys"
+    voted at full confidence for "SMZ*The Avenue Hair" - a $1292 hair salon
+    charge suggested as a child's activity. Nothing about the rows is unusual:
+    both are unattached payees, so the payee-count gate cannot tell them apart.
+    The prefix names the gateway, not the shop.
+    """
+    memory = CategoryMemory()
+    hayden_splash = uuid.uuid4()
+
+    for _ in range(3):
+        memory.add(hayden_splash, description="SMZ*Vapeys Silverdaled7 Silverdale")
+    memory.observe(payee_id=None, description="SMZ*The Avenue Hair S84Whangaparaoa")
+
+    assert memory.suggest(description="SMZ*The Avenue Hair S84Whangaparaoa") is None
+    # The shop's own word still carries its history.
+    assert memory.suggest(
+        description="SMZ*Vapeys Silverdaled7 Silverdale"
+    ).category_id == hayden_splash
+
+
+def test_a_brand_that_uses_its_own_asterisk_keeps_its_token():
+    """`UBER * EATS` is the brand's format, not a gateway: the space is the tell.
+
+    Over-blocking would quietly cost every suggestion that depends on a brand
+    written this way, so the rule only fires on the ``PREFIX*`` form.
+    """
+    memory = CategoryMemory()
+    takeaways = uuid.uuid4()
+    for _ in range(3):
+        memory.add(takeaways, description="UBER * EATS PENDING Christchurch")
+
+    suggestion = memory.suggest(description="UBER * EATS PENDING Auckland")
+    assert suggestion is not None
+    assert suggestion.matched == "eats"
+    assert suggestion.category_id == takeaways
+
+
 def test_a_new_decision_is_immediately_part_of_the_memory():
     """The property the whole design rests on: no retraining step."""
     memory = CategoryMemory()
