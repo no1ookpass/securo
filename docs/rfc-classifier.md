@@ -75,33 +75,61 @@ suggestion store for categories, and no confidence gate anywhere.
 
 ## Design
 
-### Phase 0 — record decisions (no model)
+### Phase 0 - record decisions (not yet built)
 
-Schema only. Nothing changes for the user.
+Schema only. Nothing changes for the user: a `category_source` column plus an
+append-only decision log, so Phase 1 can be measured against human labels rather than
+auto-written ones. The backtest below works without it, but its precision figure is
+measured against whatever category is on the row, including rule-set ones.
 
-- `transactions.category_source`: `rule | provider | import_column | installment | user | classifier | unknown`.
-  Backfill existing rows as `unknown` rather than guessing.
-- An append-only `category_decisions` audit row for every human change: transaction,
-  from, to, endpoint, user, timestamp. This is the label source.
-- `categorisation_suggestions` modelled on `ReconciliationSuggestion`:
-  `(workspace_id, transaction_id, target_kind, target_id, scores JSONB, model_version,
-  status, resolved_by, resolved_at)`, unique on the dedupe pair, statuses
-  `pending | accepted | declined | expired`, declines remembered, stale rows expire lazily.
+### Phase 1 — merchant memory (implemented)
 
-Nothing else can be measured without this phase, so it ships first and alone.
+`backend/app/services/categorisation_memory.py`, plus `python -m app.cli
+categorisation-backtest [workspace_id]`.
 
-### Phase 1 — merchant memory (pure SQL, no new dependency)
+Instance-based learning: no authored pattern and no training step. Two indexes are
+built from transactions that already carry a category - `payee -> category` counts and
+`distinctive description token -> category` counts - and grading a row is a vote over
+them. The payee index is consulted first and wins, because the aggregator has already
+resolved the merchant entity (Akahu maps every Woolworths descriptor shape onto one
+payee, and keeps Uber and Uber Eats apart). The token index is the fallback for rows
+with no payee: imports, manual entries, pending rows.
 
-Normalise the counterparty string into a stable key, then per workspace keep
-`key -> category` counts built from confirmed history. Suggest only when there are at
-least N observations and at least X purity. Emits nothing otherwise.
+Because the examples are the rows themselves, history is included automatically and a
+category chosen now is part of the memory on the next build. There is nothing to
+retrain or invalidate.
 
-### Phase 2 — a small model
+Guards, none of which were guesses:
+
+- `MIN_EVIDENCE = 3` decisions and `MIN_SHARE = 0.8` agreement before anything is
+  suggested. Below that the memory emits nothing rather than a coin toss.
+- A token seen under more than one payee is not evidence (`MAX_TOKEN_PAYEES = 1`).
+  Without it, `warehouse` voted Groceries for Bunnings because The Warehouse's history
+  is mostly groceries.
+- Noise tokens learned from the backtest, not from taste: `tfr` (suggested Education
+  for rent transfers), `online` (Groceries for a DIY store), reference codes shaped
+  like `fc02`, and plain English words.
+
+Backtest on the live workspace on 2026-10-26, 499 graded categorised transactions:
+
+| min evidence | min share | coverage | precision |
+|---|---|---|---|
+| 2 | 0.70 | 90% | 100% |
+| 3 | 0.80 | 86% | 100% |
+| 5 | 0.90 | 79% | 100% |
+
+Coverage is the share of rows the memory was willing to grade; the remainder are
+merchants with fewer than three decisions behind them. Precision was 96-97% before the
+token gate and noise fixes, which is how those gaps were found.
+
+### Phase 2 — a small model (not yet needed)
 
 Features: description tokens, amount bucket, account, weekday, existing tags. Trained
 per workspace on the Phase 0 labels. Start with multinomial Naive Bayes — it is a
 counting problem, it is explainable, and it needs no new dependency. Reach for
-`scikit-learn` only if measurements justify the install.
+`scikit-learn` only if measurements justify the install. Phase 1 already reaches 100%
+precision on the live workspace, so this waits until coverage (86%) is the thing that
+needs improving, not precision.
 
 ### Phase 3 — embeddings
 
@@ -109,6 +137,7 @@ counting problem, it is explainable, and it needs no new dependency. Reach for
 though today only the agents knowledge base uses them. Embed the merchant string and
 use pgvector kNN to handle "same shop, different descriptor", which token overlap
 misses. `text_similarity.token_overlap` exists but is only wired into reconciliation.
+This is the natural answer to the coverage gap: merchants with one or two decisions.
 
 ### The contract, in every phase
 
@@ -129,20 +158,23 @@ misses. `text_similarity.token_overlap` exists but is only wired into reconcilia
 - A suggestion chip on the transaction row: proposed category, confidence, and the
   evidence ("12 similar, 11 agreed"), with accept and dismiss.
 - A review queue reusing the reconciliation queue pattern.
+- A "learned merchants" list — merchant, category, vote counts — that can be corrected
+  in one click. This is the audit surface, and it replaces per-merchant rules.
 - The import preview shows suggestions as an unselected hint, never a default.
 
 ### Measurement
 
 Acceptance rate overall and per category, precision at the display threshold, and how
-often a suggestion is replaced by a different category (the correction rate). Without
-these numbers the thresholds are guesses.
+often a suggestion is replaced by a different category (the correction rate). The
+backtest command is the offline half of this and is what picked the thresholds above.
 
 ## Open decisions
 
 1. Do the bank-category mapping and instalment inheritance stay as silent writes, or
    become suggestions too? `use_provider_categories` already exists as a kill switch.
 2. v1 scope: categories only, or categories + tags + payee?
-3. Cold-start thresholds (for example: 10 confirmed observations of a merchant and 80%
-   agreement before suggesting).
-4. Does the model also learn from reconciliation accepts, or strictly from
+3. Does the model also learn from reconciliation accepts, or strictly from
    categorisation and tagging?
+4. Next slice: wire the memory into arrival (suggestion rows + UI), or close the
+   coverage gap first with embeddings for merchants that have one or two decisions?
+

@@ -60,10 +60,63 @@ async def create_user(email: str, password: str) -> None:
         print(f"User created successfully: {email}")
 
 
+async def categorisation_backtest(workspace_id: str | None = None) -> None:
+    """Replay every categorised transaction and score the category memory.
+
+    Each row is graded only against decisions made before it, which is what
+    production sees: history first, then each new categorisation becoming
+    training data for the next. Read-only.
+    """
+    from app.models.category import Category
+    from app.models.workspace import Workspace
+    from app.services import categorisation_memory
+
+    async with async_session_maker() as session:
+        if workspace_id:
+            workspace_ids = [uuid.UUID(workspace_id)]
+        else:
+            workspace_ids = list((await session.execute(select(Workspace.id))).scalars())
+
+        for ws_id in workspace_ids:
+            names = {
+                str(row.id): row.name
+                for row in await session.execute(
+                    select(Category.id, Category.name).where(
+                        Category.workspace_id == ws_id
+                    )
+                )
+            }
+            results = await categorisation_memory.backtest(session, ws_id)
+            print(f"\nworkspace {ws_id}")
+            print(
+                f"{'min_ev':>6} {'share':>6} {'graded':>7} {'suggested':>10}"
+                f" {'correct':>8} {'coverage':>9} {'precision':>10} {'payee/desc':>11}"
+            )
+            for result in results:
+                print(
+                    f"{result.min_evidence:>6} {result.min_share:>6.2f}"
+                    f" {result.graded:>7} {result.suggested:>10} {result.correct:>8}"
+                    f" {result.coverage:>8.0%} {result.precision:>9.0%}"
+                    f" {result.by_payee:>5}/{result.by_description:<5}"
+                )
+            for result in results:
+                if not result.mismatches:
+                    continue
+                print(f"  wrong at min_ev={result.min_evidence} share={result.min_share:.2f}:")
+                for label, proposed, actual, source, matched in result.mismatches[:5]:
+                    print(
+                        f"    {label!r}: suggested {names.get(proposed, proposed)}"
+                        f", was {names.get(actual, actual)}"
+                        f" (via {source} {matched!r})"
+                    )
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python -m app.cli create-user <email> <password>")
+        print("  python -m app.cli generate-recurring")
+        print("  python -m app.cli categorisation-backtest [workspace_id]")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -76,9 +129,16 @@ def main() -> None:
         asyncio.run(create_user(email, password))
     elif command == "generate-recurring":
         asyncio.run(generate_recurring())
+    elif command == "categorisation-backtest":
+        asyncio.run(
+            categorisation_backtest(sys.argv[2] if len(sys.argv) > 2 else None)
+        )
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: create-user, generate-recurring")
+        print(
+            "Available commands: create-user, generate-recurring,"
+            " categorisation-backtest"
+        )
         sys.exit(1)
 
 
