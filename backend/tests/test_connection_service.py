@@ -865,6 +865,61 @@ async def test_sync_connection_new_transactions(session: AsyncSession, test_user
 
 
 @pytest.mark.asyncio
+async def test_sync_connection_backfills_an_account_added_after_the_connection(
+    session: AsyncSession, test_user, test_workspace,
+):
+    """An account added at the bank later gets its history, not 14 days of it.
+
+    The sync window is anchored on `connection.last_sync_at`, which says nothing
+    about an account the connection has never seen. On 2026-10-26 eight accounts
+    added to a live Akahu connection came back with between zero and four
+    transactions each: Akahu maps `since` onto the transaction-date `start`
+    parameter, so the incremental window silently truncated their history.
+    """
+    conn = await _make_connection(session, test_user.id, "Late Accounts Bank")
+
+    known = AccountData(
+        external_id="late-acc-known", name="Main", type="checking",
+        balance=Decimal("100"), currency="BRL",
+    )
+    added_later = AccountData(
+        external_id="late-acc-new", name="Added Later", type="checking",
+        balance=Decimal("50"), currency="BRL",
+    )
+
+    mock_provider = AsyncMock()
+    mock_provider.refresh_credentials = AsyncMock(return_value={"token": "refreshed"})
+    mock_provider.get_accounts = AsyncMock(return_value=[known])
+    mock_provider.get_transactions = AsyncMock(return_value=[
+        TransactionData(
+            external_id="late-tx-1", description="COFFEE",
+            amount=Decimal("5"), date=date.today(), type="debit", currency="BRL",
+        ),
+    ])
+
+    with patch("app.services.connection_service.get_provider", return_value=mock_provider), \
+         patch("app.services.connection_service.detect_transfer_pairs", new_callable=AsyncMock), \
+         patch("app.services.connection_service.stamp_primary_amount", new_callable=AsyncMock), \
+         patch("app.services.connection_service.apply_rules_to_transaction", new_callable=AsyncMock):
+        # First sync creates the known account and gives it one transaction.
+        await sync_connection(session, conn.id, test_workspace.id, test_user.id)
+
+        # The user then adds an account in their banking app.
+        mock_provider.get_accounts = AsyncMock(return_value=[known, added_later])
+        mock_provider.get_transactions = AsyncMock(return_value=[])
+        await sync_connection(session, conn.id, test_workspace.id, test_user.id)
+
+    since_by_account = {
+        call.args[1]: call.args[2]
+        for call in mock_provider.get_transactions.call_args_list
+    }
+    # No history yet means no window: ask for everything the provider has.
+    assert since_by_account["late-acc-new"] is None
+    # An account we have already synced keeps the incremental 14-day rewind.
+    assert since_by_account["late-acc-known"] is not None
+
+
+@pytest.mark.asyncio
 async def test_sync_connection_rate_limited_reports_outcome_and_keeps_last_sync(
     session: AsyncSession, test_user, test_workspace,
 ):
