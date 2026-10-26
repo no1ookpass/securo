@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import String, select, desc, func, case
+from sqlalchemy import String, select, desc, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.app_clock import app_today
@@ -316,6 +316,37 @@ def _date_points(
             points.append(end)
 
     return points
+
+
+async def get_report_data_range(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+) -> tuple[date | None, date | None]:
+    """The span of transaction data the workspace actually has (issue #765).
+
+    Feeds the Reports page year picker: the UI lists one entry per year
+    between the lower bound and the current year. Buckets by the same
+    reporting date the reports aggregate on, so a year only shows up when
+    the reports can actually display it. Opening balances are excluded,
+    their dates are synthetic. Ignored transactions and transactions in
+    ignored categories are excluded too, as every report tab drops them.
+    """
+    accounting_mode = await get_credit_card_accounting_mode(session)
+    result = await session.execute(
+        select(
+            func.min(reporting_date_col(accounting_mode)),
+            func.max(reporting_date_col(accounting_mode)),
+        )
+        .outerjoin(Category, Transaction.category_id == Category.id)
+        .where(
+            Transaction.workspace_id == workspace_id,
+            Transaction.source != "opening_balance",
+            Transaction.is_ignored.is_(False),
+            or_(Transaction.category_id.is_(None), Category.is_ignored.is_(False)),
+        )
+    )
+    min_date, max_date = result.one()
+    return min_date, max_date
 
 
 async def get_net_worth_report(

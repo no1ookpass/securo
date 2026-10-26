@@ -1982,6 +1982,9 @@
     "oversellWarning": "Masz tylko {{available}} jednostek — pozycje krótkie nie są obsługiwane.",
     "noPriceBadge": "bez ceny",
     "noPriceWarning": "Dodano bez ceny zakupu — dodaj swoje zakupy, aby śledzić średnią cenę i zwrot.",
+    "noFxRate": "brak kursu",
+    "noFxRateTitle": "Dla tej waluty nie ma dostępnego kursu wymiany. Aktywo jest wyświetlane w oryginalnej walucie i pomijane w sumach.",
+    "fxRateMissing": "Dla {{currencies}} nie ma dostępnego kursu wymiany. Te aktywa są wyświetlane w oryginalnej walucie i pomijane w sumach.",
     "colAsset": "Aktywo",
     "colQuantity": "Ilość",
     "colAvgPrice": "Śr. cena",
@@ -2130,6 +2133,8 @@
     "rangeLastMonth": "Miesiąc ubiegły",
     "periodPrev": "Poprzedni okres",
     "periodNext": "Następny okres",
+    "year": "Rok",
+    "yearPickerHelp": "Pokaż jeden rok kalendarzowy swoich danych",
     "intervalDaily": "D",
     "intervalWeekly": "T",
     "intervalMonthly": "M",
@@ -2630,6 +2635,28 @@
     "finish": "Zaczynamy"
   },
   "agents": {
+    "templates": {
+      "title": "Zacznij od szablonu",
+      "subtitle": "Gotowi agenci do typowych zadań. Jedno kliknięcie tworzy w pełni działającego agenta, którego można przemianować i edytować.",
+      "create": "Utwórz",
+      "presetHint": "Start z szablonu {{template}}. Wszystko jest edytowalne.",
+      "savingsAdvisor": {
+        "name": "Doradca oszczędności",
+        "description": "Porównuje Twoje wydatki miesiąc do miesiąca i podpowiada, gdzie można zaoszczędzić więcej."
+      },
+      "monthlyReview": {
+        "name": "Miesięczne podsumowanie",
+        "description": "Podsumowuje Twój miesiąc: dochody, wydatki, majątek netto i na co uważać."
+      },
+      "budgetWatcher": {
+        "name": "Strażnik budżetu",
+        "description": "Czujnie obserwuje Twoje budżety i mówi, które są blisko limitu lub go przekraczają."
+      },
+      "recurringAuditor": {
+        "name": "Audytor opłat cyklicznych",
+        "description": "Wypisuje Twoje subskrypcje i zaznacza zapomniane, zduplikowane lub podwyższone opłaty."
+      }
+    },
     "title": "Agenci",
     "subtitle": "Twórz konwersacyjnych asystentów na bazie swoich danych w Securo. Każdy agent może mieć własną bazę wiedzy, narzędzia i dostawcę.",
     "newAgent": "Nowy agent",
@@ -2759,7 +2786,9 @@
         "create_recurring_transaction": "Dodaj transakcję cykliczną",
         "update_recurring_transaction": "Zaktualizuj transakcję cykliczną",
         "cancel_recurring_transaction": "Anuluj transakcję cykliczną",
-        "create_goal": "Utwórz cel"
+        "create_goal": "Utwórz cel",
+        "link_transfer": "Połącz jako przelew",
+        "unlink_transfer": "Rozłącz przelew"
       },
       "summary": {
         "categorize_one": "{{count}} transakcja → {{category}}",
@@ -2774,7 +2803,9 @@
         "updateRecurring": "{{description}} → {{changes}}",
         "deactivateRecurring": "Zatrzymaj przyszłe wystąpienia „{{description}}” (historia zachowana)",
         "deleteRecurring": "Trwale usuń „{{description}}”",
-        "createGoal": "„{{name}}” — cel {{target}}, termin {{deadline}}"
+        "createGoal": "„{{name}}” — cel {{target}}, termin {{deadline}}",
+        "linkTransfer": "{{from}} → {{to}}",
+        "unlinkTransfer": "{{from}} i {{to}} znów będą zwykłymi transakcjami"
       }
     },
     "conversation": {

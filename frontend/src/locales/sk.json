@@ -2009,6 +2009,9 @@
     "oversellWarning": "Máš len {{available}} ks — krátke pozície nie sú podporované.",
     "noPriceBadge": "bez ceny",
     "noPriceWarning": "Pridané bez nákupnej ceny — doplň nákupy, aby sa sledovala priemerná cena a výnos.",
+    "noFxRate": "chýba kurz",
+    "noFxRateTitle": "Pre túto menu nie je k dispozícii kurz. Aktívum sa zobrazuje v pôvodnej mene a je vynechané z celkov.",
+    "fxRateMissing": "Pre {{currencies}} nie je k dispozícii kurz. Tieto aktíva sa zobrazujú v pôvodnej mene a sú vynechané z celkov.",
     "colAsset": "Aktívum",
     "colQuantity": "Množ.",
     "colAvgPrice": "Priem. cena",
@@ -2157,6 +2160,8 @@
     "rangeLastMonth": "Minulý mesiac",
     "periodPrev": "Predchádzajúce obdobie",
     "periodNext": "Nasledujúce obdobie",
+    "year": "Rok",
+    "yearPickerHelp": "Zobraziť jeden kalendárny rok svojich dát",
     "intervalDaily": "D",
     "intervalWeekly": "T",
     "intervalMonthly": "M",
@@ -2662,6 +2667,28 @@
     "finish": "Začať"
   },
   "agents": {
+    "templates": {
+      "title": "Začať šablónou",
+      "subtitle": "Hotoví agenti pre bežné úlohy. Jedným kliknutím vytvoríte plne funkčného agenta, ktorý sa dá premenovať a upravovať.",
+      "create": "Vytvoriť",
+      "presetHint": "Vytvárate z šablóny {{template}}. Všetko je editovateľné.",
+      "savingsAdvisor": {
+        "name": "Doporučiteľ úspor",
+        "description": "Porovnáva vaše výdavky mesiac od mesiaca a navrhuje, kde ušetriť viac."
+      },
+      "monthlyReview": {
+        "name": "Mesačný prehľad",
+        "description": "Zhrňuje váš mesiac: príjmy, výdavky, čistá hodnota a na čo si dať pozor."
+      },
+      "budgetWatcher": {
+        "name": "Hliadka rozpočtu",
+        "description": "Drží palce vašim rozpočtom a povie, ktoré sú blízko limitu alebo ho prekročili."
+      },
+      "recurringAuditor": {
+        "name": "Audit opakujúcich sa platieb",
+        "description": "Vypíše vaše predplatné a upozorní na zabudnuté, duplicitné alebo zdražené platby."
+      }
+    },
     "title": "Agenti",
     "subtitle": "Vytváraj konverzačných asistentov nad svojimi dátami v Securo. Každý agent môže mať vlastnú znalostnú bázu, nástroje a poskytovateľa.",
     "newAgent": "Nový agent",
@@ -2808,7 +2835,9 @@
         "create_recurring_transaction": "Pridať opakovanú transakciu",
         "update_recurring_transaction": "Upraviť opakovanú transakciu",
         "cancel_recurring_transaction": "Zrušiť opakovanú transakciu",
-        "create_goal": "Vytvoriť cieľ"
+        "create_goal": "Vytvoriť cieľ",
+        "link_transfer": "Prepojiť ako prevod",
+        "unlink_transfer": "Zrušiť prepojenie prevodu"
       },
       "summary": {
         "categorize": "{{count}} transakcií → {{category}}",
@@ -2824,7 +2853,9 @@
         "updateRecurring": "{{description}} → {{changes}}",
         "deactivateRecurring": "Zastaviť budúce výskyty „{{description}}“ (história zostane)",
         "deleteRecurring": "Natrvalo vymazať „{{description}}“",
-        "createGoal": "„{{name}}“ — cieľová suma {{target}}, termín {{deadline}}"
+        "createGoal": "„{{name}}“ — cieľová suma {{target}}, termín {{deadline}}",
+        "linkTransfer": "{{from}} → {{to}}",
+        "unlinkTransfer": "{{from}} a {{to}} budú opäť bežné transakcie"
       }
     },
     "conversation": {

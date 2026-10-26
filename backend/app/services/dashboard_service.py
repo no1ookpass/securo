@@ -210,6 +210,37 @@ def _counts_as_user_pnl_row(tx: Transaction) -> bool:
     )
 
 
+async def _sum_to_primary(
+    session: AsyncSession,
+    buckets: dict[str, float],
+    primary_currency: str,
+    target_date: Optional[date],
+) -> tuple[float, bool]:
+    """Sum per-currency buckets in the primary currency, real rates only.
+
+    A bucket without a real rate is kept at its native amount (1:1) and the
+    returned flag reports the estimate, so the UI can surface it instead of
+    a foreign balance passing as converted (issue #1165, same rule as the
+    account list in app/api/accounts.py).
+    """
+    total = 0.0
+    fx_fallback = False
+    for currency, amount in buckets.items():
+        if currency == primary_currency:
+            total += float(amount)
+            continue
+        if not amount:
+            # Zero is zero in any currency: no rate needed, nothing estimated.
+            continue
+        rate = await _resolve_rate(session, currency, primary_currency, target_date)
+        if rate is None:
+            fx_fallback = True
+            total += float(amount)
+            continue
+        total += float((Decimal(str(amount)) * rate).quantize(Decimal("0.01")))
+    return total, fx_fallback
+
+
 async def get_summary(
     session: AsyncSession,
     workspace_id: uuid.UUID,
@@ -465,16 +496,16 @@ async def get_summary(
         total_balance[currency] = total_balance.get(currency, 0.0) + amount
         projected_balance[currency] = projected_balance.get(currency, 0.0) + amount
 
-    # Convert totals to primary currency
-    total_balance_primary = 0.0
-    for currency, amount in total_balance.items():
-        converted, _ = await convert(session, Decimal(str(amount)), currency, primary_currency, cutoff)
-        total_balance_primary += float(converted)
-
-    projected_balance_primary = 0.0
-    for currency, amount in projected_balance.items():
-        converted, _ = await convert(session, Decimal(str(amount)), currency, primary_currency, cutoff)
-        projected_balance_primary += float(converted)
+    # Convert totals to primary currency. A currency bucket without a real
+    # rate stays at its native amount and sets the flag, so the estimate is
+    # visible instead of foreign money passing as converted (issue #1165).
+    total_balance_primary, fx_fallback = await _sum_to_primary(
+        session, total_balance, primary_currency, cutoff
+    )
+    projected_balance_primary, projected_fx_fallback = await _sum_to_primary(
+        session, projected_balance, primary_currency, cutoff
+    )
+    fx_fallback = fx_fallback or projected_fx_fallback
 
     # Convert income/expenses to primary currency using amount_primary when available
     # Use real-only totals (without projections) to avoid double-counting;
@@ -637,6 +668,7 @@ async def get_summary(
         assets_value=assets_value,
         assets_value_primary=round(assets_value_primary, 2),
         primary_currency=primary_currency,
+        fx_fallback=fx_fallback,
         pending_shares_net=round(pending_shares_net, 2),
     )
 
@@ -1105,14 +1137,20 @@ async def get_projected_transactions(
 
     # Pre-fetch categories for all recurring templates that have one
     cat_ids = {r.category_id for r in recurring_list if r.category_id}
-    cat_map: dict[uuid.UUID, tuple[str, str, str]] = {}
+    cat_map: dict[uuid.UUID, tuple[str, str, str, bool]] = {}
     if cat_ids:
         cat_result = await session.execute(
-            select(Category.id, Category.name, Category.icon, Category.color)
+            select(
+                Category.id,
+                Category.name,
+                Category.icon,
+                Category.color,
+                Category.treat_as_transfer,
+            )
             .where(Category.id.in_(cat_ids))
         )
         for row in cat_result.all():
-            cat_map[row[0]] = (row[1], row[2], row[3])
+            cat_map[row[0]] = (row[1], row[2], row[3], bool(row[4]))
 
     projections: list[ProjectedTransaction] = []
     for rec in recurring_list:
@@ -1125,7 +1163,11 @@ async def get_projected_transactions(
             intended_day=rec.day_of_month or rec.start_date.day,
             weekend_adjustment=rec.weekend_adjustment,
         )
-        cat_name, cat_icon, cat_color = cat_map.get(rec.category_id, (None, None, None)) if rec.category_id else (None, None, None)
+        cat_name, cat_icon, cat_color, cat_is_transfer = (
+            cat_map.get(rec.category_id, (None, None, None, False))
+            if rec.category_id
+            else (None, None, None, False)
+        )
 
         # Convert to primary currency at the latest real rate. A missing rate
         # stays unknown; virtual projections must never manufacture a 1:1
@@ -1156,6 +1198,7 @@ async def get_projected_transactions(
                 category_name=cat_name,
                 category_icon=cat_icon,
                 category_color=cat_color,
+                category_treat_as_transfer=cat_is_transfer,
             ))
 
     return projections

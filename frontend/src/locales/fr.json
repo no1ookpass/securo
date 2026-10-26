@@ -1897,6 +1897,9 @@
     "oversellWarning": "Vous ne détenez que {{available}} unités — les positions à découvert ne sont pas prises en charge.",
     "noPriceBadge": "sans coût",
     "noPriceWarning": "Ajouté sans prix d'achat — ajoutez vos achats pour suivre le prix moyen et le rendement.",
+    "noFxRate": "pas de taux de change",
+    "noFxRateTitle": "Aucun taux de change n'est disponible pour cette devise. L'actif est affiché dans sa devise d'origine et exclu des totaux.",
+    "fxRateMissing": "Aucun taux de change n'est disponible pour {{currencies}}. Ces actifs sont affichés dans leur devise d'origine et exclus des totaux.",
     "colAsset": "Actif",
     "colQuantity": "Qté",
     "colAvgPrice": "Prix moyen",
@@ -2045,6 +2048,8 @@
     "rangeLastMonth": "Mois dernier",
     "periodPrev": "Période précédente",
     "periodNext": "Période suivante",
+    "year": "Année",
+    "yearPickerHelp": "Afficher une année calendaire de vos données",
     "intervalDaily": "J",
     "intervalWeekly": "S",
     "intervalMonthly": "M",
@@ -2530,6 +2535,28 @@
     "finish": "Commencer"
   },
   "agents": {
+    "templates": {
+      "title": "Commencer par un modèle",
+      "subtitle": "Des agents prêts à l'emploi pour des tâches courantes. Un clic crée un agent pleinement fonctionnel, renommable et modifiable.",
+      "create": "Créer",
+      "presetHint": "Démarrage depuis le modèle {{template}}. Tout est modifiable.",
+      "savingsAdvisor": {
+        "name": "Conseiller en épargne",
+        "description": "Compare vos dépenses mois après mois et suggère où vous pouvez garder plus d'argent."
+      },
+      "monthlyReview": {
+        "name": "Bilan mensuel",
+        "description": "Résume votre mois : revenus, dépenses, patrimoine et points de vigilance."
+      },
+      "budgetWatcher": {
+        "name": "Gardien des budgets",
+        "description": "Surveille vos budgets et vous dit lesquels approchent de leur limite ou la dépassent."
+      },
+      "recurringAuditor": {
+        "name": "Auditeur des récurrents",
+        "description": "Liste vos abonnements et signale les frais oubliés, dupliqués ou augmentés."
+      }
+    },
     "title": "Agents",
     "subtitle": "Créez des assistants conversationnels par-dessus vos données Securo. Chaque agent peut avoir sa propre base de connaissances, ses outils et son fournisseur.",
     "newAgent": "Nouvel agent",
@@ -2672,7 +2699,9 @@
         "create_recurring_transaction": "Ajouter une transaction récurrente",
         "update_recurring_transaction": "Mettre à jour une transaction récurrente",
         "cancel_recurring_transaction": "Annuler une transaction récurrente",
-        "create_goal": "Créer un objectif"
+        "create_goal": "Créer un objectif",
+        "link_transfer": "Lier comme virement",
+        "unlink_transfer": "Délier le virement"
       },
       "summary": {
         "categorize": "{{count}} transaction(s) → {{category}}",
@@ -2684,7 +2713,9 @@
         "updateRecurring": "{{description}} → {{changes}}",
         "deactivateRecurring": "Arrêter les occurrences futures de « {{description}} » (historique conservé)",
         "deleteRecurring": "Supprimer définitivement « {{description}} »",
-        "createGoal": "« {{name}} » — cible {{target}}, échéance {{deadline}}"
+        "createGoal": "« {{name}} » — cible {{target}}, échéance {{deadline}}",
+        "linkTransfer": "{{from}} → {{to}}",
+        "unlinkTransfer": "{{from}} et {{to}} redeviennent des transactions ordinaires"
       }
     },
     "conversation": {
