@@ -6,18 +6,19 @@ parse / dispatch behavior we care about.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
 
 from app.providers.akahu import (
     AkahuProvider,
+    _iso_to_date,
     _map_account_type,
     _parse_tokens,
-    _parse_iso_date,
 )
 from app.providers.base import ProviderRateLimited, SessionExpiredError
 
@@ -55,6 +56,15 @@ def _auth_ok(request: httpx.Request) -> None:
     assert request.headers["X-Akahu-Id"] == APP_TOKEN
 
 
+def _creds() -> dict:
+    return {
+        "user_token_enc": None,
+        "app_token_enc": None,
+        "user_token": USER_TOKEN,
+        "app_token": APP_TOKEN,
+    }
+
+
 # ----- pure helpers -----------------------------------------------------------
 
 
@@ -74,14 +84,25 @@ def test_map_account_type():
     assert _map_account_type("CHECKING") == "checking"
     assert _map_account_type("SAVINGS") == "savings"
     assert _map_account_type("CREDITCARD") == "credit_card"
+    assert _map_account_type("INVESTMENT") == "investment"
+    assert _map_account_type("KIWISAVER") == "investment"
+    assert _map_account_type("WALLET") == "wallet"
     assert _map_account_type("LOAN") == "checking"  # unmodeled → fallback
     assert _map_account_type(None) == "checking"
 
 
-def test_parse_iso_date():
-    assert _parse_iso_date("2023-01-02T00:00:00.000Z") == date(2023, 1, 2)
-    assert _parse_iso_date(None) is None
-    assert _parse_iso_date("nope") is None
+def test_iso_to_date_uses_the_new_zealand_ledger_day():
+    """Akahu reports NZ midnight as a UTC instant, one day behind in UTC terms."""
+    # NZDT (UTC+13): 11:00Z is the following midnight in Auckland.
+    assert _iso_to_date("2026-10-26T11:00:00.000Z") == date(2026, 10, 27)
+    # NZST (UTC+12): same idea, one hour later in UTC.
+    assert _iso_to_date("2026-06-11T12:00:00.000Z") == date(2026, 6, 12)
+    # An instant that is not NZ midnight keeps its own Auckland day.
+    assert _iso_to_date("2023-01-02T00:00:00.000Z") == date(2023, 1, 2)
+    # A bare date has no timezone to convert.
+    assert _iso_to_date("2024-03-05") == date(2024, 3, 5)
+    assert _iso_to_date(None) is None
+    assert _iso_to_date("nope") is None
 
 
 # ----- connection flow (token paste) ------------------------------------------
@@ -371,6 +392,52 @@ async def test_get_transactions_payee_source_none_omits_merchant():
     with _patched_client(handler):
         txns = await provider.get_transactions(creds, "acc_1", payee_source="none")
     assert txns[0].payee is None
+
+
+# ----- malformed provider payloads -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_accounts_without_items_raises_instead_of_reporting_empty():
+    """`{"success": true}` and nothing else must not read as "no accounts"."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        _auth_ok(request)
+        return httpx.Response(200, json={"success": True})
+
+    with _patched_client(handler):
+        with pytest.raises(RuntimeError, match="items"):
+            await AkahuProvider().get_accounts(_creds())
+
+
+@pytest.mark.asyncio
+async def test_transactions_with_a_null_entry_raises():
+    def handler(request: httpx.Request) -> httpx.Response:
+        _auth_ok(request)
+        return httpx.Response(200, json=_txn_payload([None]))
+
+    with _patched_client(handler):
+        with pytest.raises(RuntimeError, match="object"):
+            await AkahuProvider().get_transactions(_creds(), "acc_1")
+
+
+@pytest.mark.asyncio
+async def test_get_transactions_start_is_just_before_nz_midnight():
+    """`start` is exclusive and compared in UTC, so it must be a precise instant."""
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        _auth_ok(request)
+        captured.update(dict(request.url.params))
+        return httpx.Response(200, json=_txn_payload([]))
+
+    since = date(2026, 10, 27)
+    with _patched_client(handler):
+        await AkahuProvider().get_transactions(_creds(), "acc_1", since=since)
+
+    start = datetime.fromisoformat(captured["start"])
+    midnight = datetime.combine(since, time.min, tzinfo=ZoneInfo("Pacific/Auckland"))
+    assert midnight - start == timedelta(milliseconds=1)
 
 
 # ----- error mapping / credential lifecycle -----------------------------------

@@ -31,9 +31,10 @@ pagination, NZFCC category groups) are contained in this module.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -57,6 +58,13 @@ logger = logging.getLogger(__name__)
 AKAHU_DEFAULT_HISTORY_DAYS = 365
 AKAHU_TRANSACTION_PAGE_LIMIT = 20  # safety cap on pages (100 txns/page at Akahu)
 AKAHU_HTTP_TIMEOUT = 30.0
+
+# Akahu timestamps are UTC instants, but the ledger date a statement shows is
+# the New Zealand civil date. Akahu reports NZ midnight as `…T11:00:00.000Z`
+# under NZDT and `…T12:00:00.000Z` under NZST, so reading the UTC date files
+# every transaction one day early - and the 1st of a month into the month
+# before it.
+AKAHU_LEDGER_TIMEZONE = ZoneInfo("Pacific/Auckland")
 
 # Token prefixes from my.akahu.nz/developers. Stable enough to locate the two
 # tokens in a combined paste regardless of order or whitespace.
@@ -83,14 +91,21 @@ def _parse_tokens(raw: str) -> tuple[str, str]:
     return user_token, app_token
 
 
+# Akahu account types. Anything unmodelled (LOAN, TERMDEPOSIT, ...) falls back
+# to `checking`.
+_ACCOUNT_TYPE_MAP = {
+    "CHECKING": "checking",
+    "SAVINGS": "savings",
+    "CREDITCARD": "credit_card",
+    "KIWISAVER": "investment",
+    "INVESTMENT": "investment",
+    "WALLET": "wallet",
+}
+
+
 def _map_account_type(akahu_type: Optional[str]) -> str:
     """Map an Akahu account ``type`` to Securo's internal types."""
-    mapping = {
-        "CHECKING": "checking",
-        "SAVINGS": "savings",
-        "CREDITCARD": "credit_card",
-    }
-    return mapping.get((akahu_type or "").upper(), "checking")
+    return _ACCOUNT_TYPE_MAP.get((akahu_type or "").upper(), "checking")
 
 
 def _to_decimal(value: Any) -> Optional[Decimal]:
@@ -102,13 +117,54 @@ def _to_decimal(value: Any) -> Optional[Decimal]:
         return None
 
 
-def _parse_iso_date(value: Optional[str]) -> Optional[date]:
+def _iso_to_date(value: Any) -> Optional[date]:
+    """Akahu ``date`` -> the New Zealand calendar date of the ledger entry.
+
+    Akahu sends NZ midnight as a UTC instant (``…T11:00:00.000Z`` under NZDT,
+    ``…T12:00:00.000Z`` under NZST), so the UTC date is a day behind the ledger
+    date. Values with no time component are taken as plain dates.
+    """
     if not value:
         return None
+    text = str(value)
     try:
-        return date.fromisoformat(value[:10])
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
-        return None
+        try:
+            return date.fromisoformat(text[:10])
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        return parsed.date()
+    return parsed.astimezone(AKAHU_LEDGER_TIMEZONE).date()
+
+
+def _require_object(value: Any, context: str) -> dict:
+    """Return ``value`` if it is an object, else raise naming the context."""
+    if not isinstance(value, dict):
+        raise RuntimeError(
+            f"Akahu {context}: expected an object, got {type(value).__name__}"
+        )
+    return value
+
+
+def _optional_object(value: Any, context: str) -> dict:
+    return {} if value is None else _require_object(value, context)
+
+
+def _items(payload: dict, context: str) -> list[dict]:
+    """Collection entries, refusing a payload that omits or mistypes ``items``.
+
+    A ``{"success": true}`` with no ``items`` must not read as "no data": an
+    account or transaction sync would then report an empty result and silently
+    import nothing, which is indistinguishable from a genuinely empty account.
+    """
+    items = payload.get("items")
+    if not isinstance(items, list):
+        raise RuntimeError(
+            f"Akahu {context}: expected an `items` list, got {type(items).__name__}"
+        )
+    return [_require_object(item, f"{context} item") for item in items]
 
 
 class AkahuProvider(BankProvider):
@@ -211,23 +267,22 @@ class AkahuProvider(BankProvider):
         )
         # GET /me returns a single object under `item` (not a list under
         # `items`). Tolerate the list shape as a defensive fallback.
-        me_item = me.get("item")
-        if not isinstance(me_item, dict):
-            me_items = me.get("items") or []
-            me_item = me_items[0] if me_items else None
-        user_id = me_item.get("_id") if isinstance(me_item, dict) else None
+        me_item = _optional_object(me.get("item"), "identity")
+        if not me_item:
+            me_list = me.get("items")
+            if isinstance(me_list, list) and me_list:
+                me_item = _require_object(me_list[0], "identity")
+        user_id = me_item.get("_id")
         if not user_id:
             raise RuntimeError("Akahu /me did not return a user id")
 
         accounts_payload = await self._request(
             "GET", "/accounts", user_token=user_token, app_token=app_token
         )
+        raw_accounts = _items(accounts_payload, "accounts")
         accounts = [
             acc
-            for acc in (
-                self._build_account(raw)
-                for raw in accounts_payload.get("items") or []
-            )
+            for acc in (self._build_account(raw) for raw in raw_accounts)
             if acc is not None
         ]
 
@@ -241,10 +296,8 @@ class AkahuProvider(BankProvider):
         # `connection` object (Akahu's account model). Fall back to "Akahu".
         institution_name = "Akahu"
         logo_url: Optional[str] = None
-        for raw in accounts_payload.get("items") or []:
-            if not isinstance(raw, dict):
-                continue
-            conn = raw.get("connection") or {}
+        for raw in raw_accounts:
+            conn = _optional_object(raw.get("connection"), "connection")
             if conn.get("name"):
                 institution_name = conn["name"]
             logo_url = logo_url or conn.get("logo")
@@ -263,39 +316,41 @@ class AkahuProvider(BankProvider):
 
     @staticmethod
     def _build_account(raw: dict) -> Optional[AccountData]:
-        account_id = raw.get("_id")
+        account = _require_object(raw, "account")
+        account_id = account.get("_id")
         if not account_id:
             return None
-        if str(raw.get("status") or "ACTIVE").upper() == "INACTIVE":
+        if str(account.get("status") or "ACTIVE").upper() == "INACTIVE":
             # Akahu lost access to this account; the stored Securo row and its
             # history stay put, but we don't re-create/refresh it this run.
             logger.info("Skipping INACTIVE Akahu account %s", account_id)
             return None
-        balance_obj = raw.get("balance") or {}
+        balance_obj = _optional_object(account.get("balance"), "balance")
         balance = _to_decimal(balance_obj.get("current")) or Decimal("0")
         currency = balance_obj.get("currency") or "NZD"
-        acc_type = _map_account_type(raw.get("type"))
+        acc_type = _map_account_type(account.get("type"))
         if acc_type == "credit_card" and balance < 0:
             # Akahu reports card debt as a negative balance; Securo stores
             # positive-for-debt (same convention as Pluggy/Enable Banking).
             balance = -balance
+        connection = _optional_object(account.get("connection"), "connection")
         return AccountData(
             external_id=str(account_id),
-            name=raw.get("name") or "Account",
+            name=account.get("name") or "Account",
             type=acc_type,
             balance=balance,
             currency=currency,
             credit_limit=(
                 _to_decimal(balance_obj.get("limit")) if acc_type == "credit_card" else None
             ),
-            masked_number=mask_last4(raw.get("formatted_account")),
+            masked_number=mask_last4(account.get("formatted_account")),
             # One Akahu connection spans many institutions, so each account
             # carries its own institution (name/logo) via the account's
             # `connection` object — the sync layer links the account to the
             # right Institution row (issue #345: ASB vs Hatch vs Gem Visa).
-            institution_external_id=((raw.get("connection") or {}).get("_id") or None),
-            institution_name=((raw.get("connection") or {}).get("name") or None),
-            institution_logo_url=((raw.get("connection") or {}).get("logo") or None),
+            institution_external_id=(connection.get("_id") or None),
+            institution_name=(connection.get("name") or None),
+            institution_logo_url=(connection.get("logo") or None),
         )
 
     async def get_accounts(self, credentials: dict) -> list[AccountData]:
@@ -308,7 +363,7 @@ class AkahuProvider(BankProvider):
         return [
             acc
             for acc in (
-                self._build_account(raw) for raw in payload.get("items") or []
+                self._build_account(raw) for raw in _items(payload, "accounts")
             )
             if acc is not None
         ]
@@ -324,13 +379,18 @@ class AkahuProvider(BankProvider):
         if not user_token or not app_token:
             raise SessionExpiredError("Akahu credentials missing; reconnect")
 
-        end = date.today()
-        start = since or (end - timedelta(days=AKAHU_DEFAULT_HISTORY_DAYS))
-        # Akahu's `start` is exclusive; back off a day so `since` is inclusive.
-        params: dict[str, str] = {
-            "start": (start - timedelta(days=1)).isoformat(),
-            "end": end.isoformat(),
-        }
+        today = datetime.now(timezone.utc)
+        ledger_start = since or (
+            today.astimezone(AKAHU_LEDGER_TIMEZONE).date()
+            - timedelta(days=AKAHU_DEFAULT_HISTORY_DAYS)
+        )
+        params: dict[str, str] = {"end": today.isoformat()}
+        # `start` is exclusive and compared in UTC, so ask for the instant just
+        # before NZ midnight of the first wanted day rather than a bare date.
+        midnight = datetime.combine(ledger_start, time.min, tzinfo=AKAHU_LEDGER_TIMEZONE)
+        params["start"] = (
+            midnight.astimezone(timezone.utc) - timedelta(milliseconds=1)
+        ).isoformat()
 
         transactions: list[TransactionData] = []
         for _ in range(AKAHU_TRANSACTION_PAGE_LIMIT):
@@ -341,13 +401,11 @@ class AkahuProvider(BankProvider):
                 app_token=app_token,
                 params=params,
             )
-            for raw in page.get("items") or []:
-                if not isinstance(raw, dict):
-                    continue
+            for raw in _items(page, "transactions"):
                 parsed = self._build_transaction(raw, payee_source)
                 if parsed:
                     transactions.append(parsed)
-            cursor = (page.get("cursor") or {}).get("next")
+            cursor = _optional_object(page.get("cursor"), "cursor").get("next")
             if not cursor:
                 break
             params["cursor"] = cursor
@@ -365,21 +423,22 @@ class AkahuProvider(BankProvider):
         # sign, mirroring how SimpleFIN derives debit/credit.
         txn_type = "debit" if amount < 0 else "credit"
         amount = amount.copy_abs()
-        txn_date = _parse_iso_date(raw.get("date"))
+        txn_date = _iso_to_date(raw.get("date"))
         if not txn_date:
             return None
         description = (raw.get("description") or "Transaction").strip()[:500]
 
         payee: Optional[str] = None
         if payee_source in ("auto", "merchant"):
-            payee = ((raw.get("merchant") or {}).get("name") or "").strip() or None
+            merchant = _optional_object(raw.get("merchant"), "merchant")
+            payee = (merchant.get("name") or "").strip() or None
 
-        category = raw.get("category") or {}
-        pluggy_category = (
-            ((category.get("groups") or {}).get("personal_finance") or {}).get("name")
-            or category.get("name")
-            or None
+        category = _optional_object(raw.get("category"), "category")
+        groups = _optional_object(category.get("groups"), "category groups")
+        personal_finance = _optional_object(
+            groups.get("personal_finance"), "category groups"
         )
+        pluggy_category = personal_finance.get("name") or category.get("name") or None
 
         return TransactionData(
             external_id=str(txn_id),
