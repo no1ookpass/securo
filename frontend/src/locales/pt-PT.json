@@ -1305,7 +1305,9 @@
       },
       "akahu": {
         "title": "Conectar via Akahu",
-        "description": "O Akahu liga bancos da Nova Zelândia. Cria uma aplicação pessoal gratuita em my.akahu.nz/developers e cola aqui os dois tokens."
+        "description": "O Akahu liga bancos da Nova Zelândia. Cria uma aplicação pessoal gratuita em my.akahu.nz/developers e cola aqui os dois tokens.",
+        "openBridge": "Obtenha os seus tokens em my.akahu.nz",
+        "tokenHelp": "Ambos os tokens são guardados cifrados e permanecem válidos até os revogar na sua conta Akahu."
       },
       "reconnectTitle": "Reconectar com um novo token",
       "reconnectDescription": "Cola um novo token de configuração para atualizar esta ligação no lugar. Contas, transações, categorias e regras existentes são preservadas.",

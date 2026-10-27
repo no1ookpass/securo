@@ -1301,7 +1301,9 @@
       },
       "akahu": {
         "title": "Connect via Akahu",
-        "description": "Akahu connects to New Zealand banks. Create a free Personal App at my.akahu.nz/developers and paste both of your tokens here."
+        "description": "Akahu connects to New Zealand banks. Create a free Personal App at my.akahu.nz/developers and paste both of your tokens here.",
+        "openBridge": "Get your tokens at my.akahu.nz",
+        "tokenHelp": "Both tokens are stored encrypted and stay valid until you revoke them in your Akahu account."
       },
       "reconnectTitle": "Reconnect with a fresh token",
       "reconnectDescription": "Paste a new setup token to refresh this connection in place. Existing accounts, transactions, categories, and rules are preserved.",

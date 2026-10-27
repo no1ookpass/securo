@@ -1385,7 +1385,9 @@
       },
       "akahu": {
         "title": "Připojení přes Akahu",
-        "description": "Akahu se připojuje k novozélandským bankám. Vytvořte si bezplatnou Personal App na my.akahu.nz/developers a vložte sem oba své tokeny."
+        "description": "Akahu se připojuje k novozélandským bankám. Vytvořte si bezplatnou Personal App na my.akahu.nz/developers a vložte sem oba své tokeny.",
+        "openBridge": "Získejte své tokeny na my.akahu.nz",
+        "tokenHelp": "Oba tokeny jsou uloženy šifrovaně a zůstávají platné, dokud je v účtu Akahu neodvoláte."
       },
       "reconnectTitle": "Znovu propojit s novým tokenem",
       "reconnectDescription": "Vložte nový setup token a obnovte toto propojení na místě. Stávající účty, transakce, kategorie a pravidla zůstanou zachovány.",
