@@ -60,10 +60,38 @@ async def create_user(email: str, password: str) -> None:
         print(f"User created successfully: {email}")
 
 
+async def accounts_relabel(workspace_id: str | None = None) -> None:
+    """Give synced accounts the "Institution - Account" label, without a re-sync.
+
+    The sync used to label an account with just its institution, so every
+    Kiwibank account read "Kiwibank". This rewrites only the labels the sync
+    owns - empty ones, the bare institution, and our own "Institution - Account"
+    form - and leaves anything a person typed alone. It touches no transactions
+    and asks the provider for nothing.
+    """
+    from app.models.workspace import Workspace
+    from app.services.connection_service import relabel_auto_account_names
+
+    async with async_session_maker() as session:
+        workspace_ids = (
+            [uuid.UUID(workspace_id)]
+            if workspace_id
+            else list((await session.execute(select(Workspace.id))).scalars())
+        )
+        total = 0
+        for ws_id in workspace_ids:
+            updated = await relabel_auto_account_names(session, ws_id)
+            print(f"workspace {ws_id}: relabelled {updated} account(s)")
+            total += updated
+        await session.commit()
+        print(f"total relabelled: {total}")
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python -m app.cli create-user <email> <password>")
+        print("  python -m app.cli accounts-relabel [workspace_id]")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -76,9 +104,13 @@ def main() -> None:
         asyncio.run(create_user(email, password))
     elif command == "generate-recurring":
         asyncio.run(generate_recurring())
+    elif command == "accounts-relabel":
+        asyncio.run(
+            accounts_relabel(sys.argv[2] if len(sys.argv) > 2 else None)
+        )
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: create-user, generate-recurring")
+        print("Available commands: create-user, generate-recurring, accounts-relabel")
         sys.exit(1)
 
 

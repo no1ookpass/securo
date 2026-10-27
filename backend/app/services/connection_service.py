@@ -85,6 +85,55 @@ def _clean_institution_name(value: object) -> Optional[str]:
     return value[:255] if isinstance(value, str) and value.strip() else None
 
 
+def _default_account_label(
+    institution_name: Optional[str], account_name: Optional[str]
+) -> Optional[str]:
+    """The label the UI shows for a synced account: "Kiwibank - Streamline".
+
+    The institution alone cannot tell one account from another: a link reaches
+    several banks and one bank holds several accounts, so a row labelled just
+    "Kiwibank" says nothing about which account it is - and four of them read
+    identically in every account picker in the app.
+
+    Only ever used for labels the sync owns. A display_name somebody typed is
+    never replaced by this.
+    """
+    institution = (institution_name or "").strip()
+    account = (account_name or "").strip()
+    if not institution:
+        return None
+    if not account:
+        return institution
+    # A bank that returns its own name as the account's, or a provider whose
+    # account name is already inside the institution name ("XP" under "XP
+    # Investimentos CCTVM S/A"), gains nothing from being repeated.
+    if account.casefold() in institution.casefold():
+        return institution
+    return f"{institution} - {account}"
+
+
+def _is_auto_account_label(
+    display_name: Optional[str], institution_name: Optional[str], account_name: Optional[str]
+) -> bool:
+    """Whether a label is one the sync wrote, rather than one a person typed.
+
+    Three shapes count as ours: empty, the bare institution (what the sync wrote
+    before this change), and anything ending in " - <account name>" - our own
+    format, including the one written under an institution name that has since
+    been renamed. Everything else was typed by somebody and is never replaced.
+    """
+    current = (display_name or "").strip()
+    if not current:
+        return True
+    institution = (institution_name or "").strip()
+    if institution and current.casefold() == institution.casefold():
+        return True
+    account = (account_name or "").strip()
+    if not account:
+        return False
+    return current.casefold().endswith(f" - {account}".casefold())
+
+
 def _wallet_external_id(connection_external_id: str, account_key: Optional[str]) -> str:
     """The per-account wallet key, squeezed into the 255-char column.
 
@@ -1379,7 +1428,9 @@ async def handle_oauth_callback(
             connection_id=connection.id,
             external_id=acc_data.external_id,
             name=acc_data.name,
-            display_name=institution.name if institution else None,
+            display_name=_default_account_label(
+                institution.name if institution else None, acc_data.name
+            ),
             masked_number=acc_data.masked_number,
             type=acc_data.type,
             balance=_account_balance(acc_data, auto_invested_deducted),
@@ -2426,10 +2477,17 @@ async def sync_connection(
                 # Backfills existing accounts on next sync (issue #345).
                 if institution is not None:
                     account.institution_id = institution.id
-                    # Only when the user hasn't named the account themselves —
-                    # never overwrite a manual display_name.
-                    if account.display_name is None:
-                        account.display_name = institution.name
+                    # The sync owns this label only while it is still the one
+                    # the sync wrote: empty, the older bare-institution form
+                    # (four Kiwibank accounts all read "Kiwibank" that way), or
+                    # an earlier "Institution - Account" from before a rename.
+                    # Anything else was typed by a person and is left alone.
+                    if _is_auto_account_label(
+                        account.display_name, institution.name, acc_data.name
+                    ):
+                        account.display_name = _default_account_label(
+                            institution.name, acc_data.name
+                        )
                 if acc_data.type == "credit_card":
                     # Preserve existing CC metadata when the provider doesn't
                     # expose it. Pluggy's creditData fields (limit, close/due
@@ -2463,7 +2521,9 @@ async def sync_connection(
                     external_id=acc_data.external_id,
                     stable_external_id=acc_data.stable_external_id,
                     name=acc_data.name,
-                    display_name=institution.name if institution else None,
+                    display_name=_default_account_label(
+                        institution.name if institution else None, acc_data.name
+                    ),
                     masked_number=acc_data.masked_number,
                     type=acc_data.type,
                     balance=_account_balance(acc_data, auto_invested_deducted),
@@ -2979,3 +3039,43 @@ async def delete_connection(
 
     await session.commit()
     return True
+
+
+async def relabel_auto_account_names(
+    session: AsyncSession, workspace_id: uuid.UUID
+) -> int:
+    """Upgrade the account labels the sync wrote to "Institution - Account".
+
+    The sync used to label an account with just its institution, so four
+    Kiwibank accounts all read "Kiwibank" in every picker. New rows get the full
+    label; this brings the existing ones level without a re-sync, because
+    nothing about the accounts or their transactions changes - only the string
+    the UI shows.
+
+    A display_name somebody typed is never touched. The only labels rewritten
+    are the ones the sync itself owns: still empty, or still exactly the bare
+    institution name. That is the same rule the next sync applies, so running
+    this and syncing afterwards cannot disagree.
+    """
+    rows = (
+        await session.execute(
+            select(Account, Institution)
+            .join(Institution, Institution.id == Account.institution_id)
+            .where(
+                Account.workspace_id == workspace_id,
+                Account.institution_id.is_not(None),
+            )
+        )
+    ).all()
+
+    updated = 0
+    for account, institution in rows:
+        if not _is_auto_account_label(account.display_name, institution.name, account.name):
+            continue  # typed by a person
+        label = _default_account_label(institution.name, account.name)
+        if label and label != account.display_name:
+            account.display_name = label
+            updated += 1
+    if updated:
+        await session.flush()
+    return updated
