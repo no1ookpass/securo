@@ -1299,7 +1299,13 @@
       },
       "reconnectTitle": "Reconectar con un token nuevo",
       "reconnectDescription": "Pega un token de configuración nuevo para actualizar esta conexión sin reemplazarla. Se conservan cuentas, transacciones, categorías y reglas existentes.",
-      "reconnect": "Reconectar"
+      "reconnect": "Reconectar",
+      "akahu": {
+        "title": "Conectar vía Akahu",
+        "description": "Akahu conecta bancos de Nueva Zelanda. Crea una aplicación personal gratuita en my.akahu.nz/developers y pega aquí ambos tokens.",
+        "openBridge": "Obtén tus tokens en my.akahu.nz",
+        "tokenHelp": "Ambos tokens se guardan cifrados y siguen siendo válidos hasta que los revoques en tu cuenta de Akahu."
+      }
     },
     "providers": {
       "pluggy": {
@@ -1310,6 +1316,9 @@
       },
       "simplefin": {
         "description": "Bancos de EE. UU. e internacionales vía SimpleFIN Bridge"
+      },
+      "akahu": {
+        "description": "Bancos de Nueva Zelanda a través de tu propia aplicación personal gratuita de Akahu"
       }
     },
     "reconnected": "Banco reconectado correctamente",

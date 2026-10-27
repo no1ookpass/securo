@@ -27,6 +27,8 @@ interface TokenConnectDialogProps {
 
 const PROVIDER_BRIDGE_URLS: Record<string, string> = {
   simplefin: 'https://bridge.simplefin.org/simplefin/create',
+  // Free Akahu Personal App — both the user & app tokens come from here.
+  akahu: 'https://my.akahu.nz/developers',
 }
 
 export function TokenConnectDialog({
@@ -118,7 +120,7 @@ export function TokenConnectDialog({
         {bridgeUrl && (
           <Button asChild variant="outline" className="w-full justify-between">
             <a href={bridgeUrl} target="_blank" rel="noreferrer">
-              <span>{t('accounts.tokenConnect.openBridge')}</span>
+              <span>{t(`${i18nKey}.openBridge`, t('accounts.tokenConnect.openBridge'))}</span>
               <ExternalLink size={14} />
             </a>
           </Button>
@@ -160,7 +162,7 @@ export function TokenConnectDialog({
           <p className="text-xs text-muted-foreground">
             {submitting && !isReconnect
               ? t('accounts.oauthCallback.linking')
-              : t('accounts.tokenConnect.tokenHelp')}
+              : t(`${i18nKey}.tokenHelp`, t('accounts.tokenConnect.tokenHelp'))}
           </p>
         </div>
 

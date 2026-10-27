@@ -1295,7 +1295,13 @@
       },
       "reconnectTitle": "Újracsatlakozás új tokennel",
       "reconnectDescription": "Illessz be egy új beállítási tokent a kapcsolat helyben történő frissítéséhez. A meglévő számlák, tranzakciók, kategóriák és szabályok megmaradnak.",
-      "reconnect": "Újracsatlakozás"
+      "reconnect": "Újracsatlakozás",
+      "akahu": {
+        "title": "Csatlakozás Akahu-n keresztül",
+        "description": "Az Akahu új-zélandi bankokhoz csatlakozik. Hozzon létre egy ingyenes Personal Appot a my.akahu.nz/developers oldalon, és illessze be ide mindkét tokent.",
+        "openBridge": "Szerezd be a tokenjeidet a my.akahu.nz oldalon",
+        "tokenHelp": "Mindkét token titkosítva tárolódik, és addig érvényes, amíg vissza nem vonod őket az Akahu-fiókodban."
+      }
     },
     "providers": {
       "pluggy": {
@@ -1306,6 +1312,9 @@
       },
       "simplefin": {
         "description": "Amerikai és nemzetközi bankok SimpleFIN Bridge-en keresztül"
+      },
+      "akahu": {
+        "description": "Új-zélandi bankok az ingyenes Akahu Personal Appján keresztül"
       }
     },
     "reconnected": "Bank sikeresen újracsatlakoztatva",

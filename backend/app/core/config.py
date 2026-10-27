@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     simplefin_enabled: bool = False
     simplefin_api_url: str = "https://beta-bridge.simplefin.org"
 
+    # Akahu (New Zealand open finance). Personal App tokens are per-user, so
+    # there are no server-side credentials to configure — the flag only
+    # controls whether the provider is offered.
+    akahu_enabled: bool = False
+    akahu_api_url: str = "https://api.akahu.io"
+
     # Frontend
     frontend_url: str = "http://localhost:5173"
     # Docker Compose passes FRONTEND_URL empty when it is not set, plus the

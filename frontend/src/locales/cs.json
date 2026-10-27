@@ -1379,7 +1379,13 @@
       },
       "reconnectTitle": "Znovu propojit s novým tokenem",
       "reconnectDescription": "Vložte nový setup token a obnovte toto propojení na místě. Stávající účty, transakce, kategorie a pravidla zůstanou zachovány.",
-      "reconnect": "Znovu propojit"
+      "reconnect": "Znovu propojit",
+      "akahu": {
+        "title": "Připojení přes Akahu",
+        "description": "Akahu se připojuje k novozélandským bankám. Vytvořte si bezplatnou Personal App na my.akahu.nz/developers a vložte sem oba své tokeny.",
+        "openBridge": "Získejte své tokeny na my.akahu.nz",
+        "tokenHelp": "Oba tokeny jsou uloženy šifrovaně a zůstávají platné, dokud je v účtu Akahu neodvoláte."
+      }
     },
     "providers": {
       "pluggy": {
@@ -1390,6 +1396,9 @@
       },
       "simplefin": {
         "description": "Americké a mezinárodní banky přes SimpleFIN Bridge"
+      },
+      "akahu": {
+        "description": "Novozélandské banky přes vaši bezplatnou Akahu Personal App"
       }
     },
     "reconnected": "Banka úspěšně znovu propojena",

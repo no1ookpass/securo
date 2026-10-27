@@ -1295,7 +1295,13 @@
       },
       "reconnectTitle": "新しいトークンで再接続",
       "reconnectDescription": "新しいセットアップトークンを貼り付けて、この接続をその場で更新します。既存の口座、取引、カテゴリ、ルールは保持されます。",
-      "reconnect": "再接続"
+      "reconnect": "再接続",
+      "akahu": {
+        "title": "Akahu で接続",
+        "description": "Akahu はニュージーランドの銀行に接続します。my.akahu.nz/developers で無料の Personal App を作成し、両方のトークンをここに貼り付けてください。",
+        "openBridge": "my.akahu.nz でトークンを取得",
+        "tokenHelp": "両方のトークンは暗号化して保存され、Akahu アカウントで無効化するまで有効です。"
+      }
     },
     "providers": {
       "pluggy": {
@@ -1306,6 +1312,9 @@
       },
       "simplefin": {
         "description": "SimpleFIN Bridge経由の米国および国際的な銀行"
+      },
+      "akahu": {
+        "description": "無料の Akahu Personal App 経由でニュージーランドの銀行に接続"
       }
     },
     "reconnected": "銀行に再接続しました",
