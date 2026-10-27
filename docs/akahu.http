@@ -26,8 +26,11 @@
 #   asyncio.run(m())"
 
 @base = https://api.akahu.io/v1
-@userToken = user_token~PASTE_ME
-@appToken = app_token~PASTE_ME
+@userToken = user_token_cmt7uqugk000002js7h181zfo
+@appToken = app_token_cmt7ug9xv000102ib2kb62d5a
+
+
+
 
 # Akahu ids for the accounts in question. `Zero Visa` is the empty card; the
 # other three came from the same (newest) Kiwibank consent.

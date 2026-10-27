@@ -1179,6 +1179,32 @@ export default function TransactionsPage() {
     setDismissedSuggestions((prev) => new Set(prev).add(transactionId))
   }
 
+  /**
+   * The merchant's own logo when the provider sent one worth drawing, and the
+   * category icon otherwise.
+   *
+   * The failure state matters: a logo URL that 404s has to fall back in place,
+   * because a hole where the row's icon was is worse than the icon it replaced.
+   * Most rows have no logo at all - Akahu attaches one to roughly two in three,
+   * and none to the rest - so the category icon stays the default.
+   */
+  function MerchantAvatar({ tx }: { tx: Transaction }) {
+    const [logoFailed, setLogoFailed] = useState(false)
+    if (!tx.merchant_logo || logoFailed) {
+      return <CategoryIcon icon={tx.category?.icon} color={tx.category?.color} size="lg" />
+    }
+    return (
+      <img
+        src={tx.merchant_logo}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setLogoFailed(true)}
+        className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain ring-1 ring-border"
+      />
+    )
+  }
+
   const renderDescriptionCell = (tx: Transaction) => {
     const showInlineDate = !grid.isVisible('date')
     const showInlineNotes = !grid.isVisible('notes')
@@ -1187,7 +1213,7 @@ export default function TransactionsPage() {
     const noteTags = tx.notes ? parseHashtags(tx.notes) : []
     return (
       <div className="flex items-center gap-2 md:gap-3">
-        <CategoryIcon icon={tx.category?.icon} color={tx.category?.color} size="lg" />
+        <MerchantAvatar tx={tx} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-foreground truncate">{tx.description}</p>

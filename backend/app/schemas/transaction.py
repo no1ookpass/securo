@@ -192,6 +192,12 @@ class TransactionRead(TransactionBase):
     # The paginated list fills it per page (issue #810); other endpoints
     # leave it null.
     transfer_counterpart: Optional[TransactionTransferCounterpart] = None
+    # The merchant's logo, when the provider sent one. Akahu attaches it to the
+    # transaction's `meta.logo` (roughly two rows in three); we keep the whole
+    # payload in `raw_data` and surface just this from it, rather than shipping
+    # the payload to the browser. Null whenever there is nothing worth drawing,
+    # which includes the provider's own generic placeholder.
+    merchant_logo: Optional[str] = None
     amount_primary: Optional[float] = None
     fx_rate_used: Optional[float] = None
     fx_fallback: bool = False

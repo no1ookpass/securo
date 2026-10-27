@@ -104,6 +104,36 @@ async def _attach_transfer_counterparts(
                 break
 
 
+#: The only host a merchant logo may come from. The provider supplies the URL,
+#: and a browser will fetch whatever it is given, so it is pinned rather than
+#: trusted: an allowlist here means a compromised or surprising payload cannot
+#: turn a transaction row into a beacon pointing anywhere it likes.
+MERCHANT_LOGO_HOST = "cdn.akahu.nz"
+#: The provider's catch-all graphic for merchants it does not recognise. Drawing
+#: it would put a grey blob on every unknown shop and hide the category icon
+#: that actually says something, so it counts as "no logo".
+MERCHANT_LOGO_PLACEHOLDER = "/logos/merchants/default.png"
+
+
+def _attach_merchant_logo(tx: TransactionRead, raw_data: object) -> None:
+    """Surface the provider's merchant logo, if it is one worth drawing.
+
+    Akahu puts it on the transaction payload as ``meta.logo`` - roughly two rows
+    in three, all on its own CDN. The whole payload is already kept in
+    ``raw_data``, so this costs a dictionary lookup and no extra request or
+    column; the browser only ever receives the one URL.
+    """
+    meta = (raw_data or {}).get("meta") if isinstance(raw_data, dict) else None
+    logo = (meta or {}).get("logo") if isinstance(meta, dict) else None
+    if not isinstance(logo, str):
+        return
+    if not logo.startswith(f"https://{MERCHANT_LOGO_HOST}/"):
+        return
+    if MERCHANT_LOGO_PLACEHOLDER in logo:
+        return
+    tx.merchant_logo = logo
+
+
 def _tag_fx_fallback(tx: TransactionRead, primary_currency: str) -> TransactionRead:
     """Set fx_fallback=True when a cross-currency tx isn't backed by a real rate.
 
@@ -238,7 +268,15 @@ async def list_transactions(
         primary_currency=ctx.user.primary_currency,
     )
     primary_currency = ctx.user.primary_currency
-    items = [_tag_fx_fallback(TransactionRead.model_validate(tx, from_attributes=True), primary_currency) for tx in transactions]
+    items = []
+    for tx in transactions:
+        read = _tag_fx_fallback(
+            TransactionRead.model_validate(tx, from_attributes=True), primary_currency
+        )
+        # The list is where a logo earns its place; the single-row endpoints
+        # leave it null, the same way they leave `transfer_counterpart` null.
+        _attach_merchant_logo(read, tx.raw_data)
+        items.append(read)
     await _attach_invoice_links(session, ctx, items)
     await _attach_transfer_counterparts(session, ctx.workspace.id, items)
     summary_out = (

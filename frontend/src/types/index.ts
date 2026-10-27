@@ -316,6 +316,10 @@ export interface Transaction {
    * transfer is linked to (issue #810); other endpoints leave it null.
    */
   transfer_counterpart?: { account_id: string; account_name: string } | null
+  /** The merchant's own logo, when the provider sent one worth drawing.
+   *  Null for most rows, and for the provider's generic placeholder - the
+   *  list then falls back to the category icon. */
+  merchant_logo?: string | null
   amount_primary: number | null
   fx_rate_used: number | null
   fx_fallback: boolean
