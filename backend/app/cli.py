@@ -111,6 +111,33 @@ async def categorisation_backtest(workspace_id: str | None = None) -> None:
                     )
 
 
+async def accounts_relabel(workspace_id: str | None = None) -> None:
+    """Give synced accounts the "Institution - Account" label, without a re-sync.
+
+    The sync used to label an account with just its institution, so every
+    Kiwibank account read "Kiwibank". This rewrites only the labels the sync
+    owns — empty ones and ones still exactly the bare institution name — and
+    leaves anything a person typed alone. It touches no transactions and asks
+    the provider for nothing.
+    """
+    from app.models.workspace import Workspace
+    from app.services.connection_service import relabel_auto_account_names
+
+    async with async_session_maker() as session:
+        workspace_ids = (
+            [uuid.UUID(workspace_id)]
+            if workspace_id
+            else list((await session.execute(select(Workspace.id))).scalars())
+        )
+        total = 0
+        for ws_id in workspace_ids:
+            updated = await relabel_auto_account_names(session, ws_id)
+            print(f"workspace {ws_id}: relabelled {updated} account(s)")
+            total += updated
+        await session.commit()
+        print(f"total relabelled: {total}")
+
+
 async def connections_backfill(connection_id: str) -> None:
     """Re-read a connection's full history and import whatever is missing.
 
@@ -170,6 +197,7 @@ def main() -> None:
         print("  python -m app.cli generate-recurring")
         print("  python -m app.cli categorisation-backtest [workspace_id]")
         print("  python -m app.cli connections-backfill <connection_id>")
+        print("  python -m app.cli accounts-relabel [workspace_id]")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -191,11 +219,15 @@ def main() -> None:
             print("Usage: python -m app.cli connections-backfill <connection_id>")
             sys.exit(1)
         asyncio.run(connections_backfill(sys.argv[2]))
+    elif command == "accounts-relabel":
+        asyncio.run(
+            accounts_relabel(sys.argv[2] if len(sys.argv) > 2 else None)
+        )
     else:
         print(f"Unknown command: {command}")
         print(
             "Available commands: create-user, generate-recurring,"
-            " categorisation-backtest, connections-backfill"
+            " categorisation-backtest, connections-backfill, accounts-relabel"
         )
         sys.exit(1)
 

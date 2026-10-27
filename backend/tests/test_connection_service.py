@@ -5211,7 +5211,8 @@ async def test_sync_wires_account_institutions_and_reaps_orphans(
     assert inst.name == "Chase"
     refreshed = await session.get(Account, account_id)
     assert refreshed is not None and refreshed.institution_id == inst.id
-    assert refreshed.display_name == "Chase"  # backfilled: had no display_name yet
+    # Backfilled: had no display_name yet, so the sync names both halves now.
+    assert refreshed.display_name == "Chase - Checking"
     assert await session.get(Inst, stray_id) is None  # reaped: nothing references it
     assert await session.get(Inst, kept_id) is not None  # wallet keeps its label
 
