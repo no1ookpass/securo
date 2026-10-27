@@ -1,0 +1,114 @@
+# Akahu API — ask the provider directly what it actually holds.
+#
+# Use with the VS Code "REST Client" extension (humao.rest-client), or copy any
+# request into curl. Click "Send Request" above any ### block.
+#
+# Tokens
+# ------
+# Both come from https://my.akahu.nz/developers (Personal App tokens):
+#   user_token  — the long token, sent as the Bearer credential
+#   app_token   — the short app id, sent as X-Akahu-Id
+#
+# These two are the same pair Securo's connection is using, so what you see here
+# is exactly what the sync sees. Do NOT commit real values: this file is a
+# template, and a token in git is a credential in git.
+#
+# If you want the tokens this server already holds rather than re-issuing them,
+# run this on the box and copy the two values out of your own terminal:
+#
+#   docker compose exec -T backend python -c "
+#   import asyncio; from app.core.database import async_session_maker
+#   from app.models.bank_connection import BankConnection
+#   async def m():
+#       async with async_session_maker() as s:
+#           c = await s.get(BankConnection, __import__('uuid').UUID('5e98fd42-21d9-462d-8621-15dbf22e7d1f'))
+#           print(c.credentials)
+#   asyncio.run(m())"
+
+@base = https://api.akahu.io/v1
+@userToken = user_token~PASTE_ME
+@appToken = app_token~PASTE_ME
+
+# Akahu ids for the accounts in question. `Zero Visa` is the empty card; the
+# other three came from the same (newest) Kiwibank consent.
+@zeroVisa = acc_cmvoo2v7g000c02l28id8fyta
+@wasteNot = acc_cmvoo2v6z000602l2amu04lne
+@sambamajam = acc_cmvoo2v75000802l20nki6s9e
+@savings = acc_cmvoo2v7a000a02l265nad8sg
+
+@start = 2000-01-01
+@end = 2026-10-27
+
+
+### 1. Every account Akahu knows, with balance and refresh state
+# Read `refreshed` on each item. A card that has transactions lists
+# {balance, meta, transactions}; one that has never had them lists only
+# {balance, meta}. That is the thing worth seeing with your own eyes.
+GET {{base}}/accounts
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 2. One account: balance versus refresh state
+GET {{base}}/accounts/{{zeroVisa}}
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 3. That account's transactions, ALL history (not a year)
+# An empty `items` here, with a non-zero balance in request 2, is Akahu saying
+# it holds the money but not the movements.
+GET {{base}}/accounts/{{zeroVisa}}/transactions?start={{start}}&end={{end}}
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 4. Same account, pending feed
+GET {{base}}/accounts/{{zeroVisa}}/transactions/pending
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 5. The workspace-wide feed — does the card appear anywhere at all?
+# Count the `_account` values. If the card's id never appears, no parameter
+# choice on our side could have found it.
+GET {{base}}/transactions?start={{start}}&end={{end}}
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 6. A checking account that does have history, for comparison
+GET {{base}}/accounts/{{wasteNot}}/transactions?start={{start}}&end={{end}}
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 7. How far back do the other accounts on this consent actually go?
+GET {{base}}/accounts/{{sambamajam}}/transactions?start={{start}}&end={{end}}
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 8. Kiwibank's account list as Akahu holds it (attributes tell you what was granted)
+# `attributes` per account: TRANSACTIONS / PAYMENT_TO / PAYMENT_FROM.
+GET {{base}}/accounts/{{savings}}
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
+
+
+### 9. Ask Akahu to re-pull from the bank now
+# Akahu refreshes on its own schedule (roughly daily) and throttles this. The
+# read that follows is what picks up anything new; the pull itself is async, so
+# re-run request 1 a little later rather than expecting this to return data.
+POST {{base}}/refresh
+Authorization: Bearer {{userToken}}
+X-Akahu-Id: {{appToken}}
+Accept: application/json
